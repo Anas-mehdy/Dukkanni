@@ -59,7 +59,7 @@ export default function RootLayout({
           `}
         </script>
       </head>
-      <body className="min-h-dvh flex flex-col" suppressHydrationWarning>{children}</body>
+      <body className="min-h-dvh flex flex-col overflow-x-hidden" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

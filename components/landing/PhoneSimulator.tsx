@@ -131,7 +131,7 @@ export function PhoneSimulator() {
   }, [cart, cartTotal]);
 
   return (
-    <div className="relative mx-auto max-w-[300px] sm:max-w-[340px] aspect-[9/18.5] bg-neutral-900 border-[8px] border-neutral-800 rounded-[2.5rem] shadow-2xl overflow-hidden ring-4 ring-emerald-500/10 transform rotate-1 hover:rotate-0 transition-transform duration-300">
+    <div className="relative mx-auto w-full max-w-[290px] sm:max-w-[340px] aspect-[9/18.5] bg-neutral-900 border-[8px] border-neutral-800 rounded-[2.5rem] shadow-2xl overflow-hidden ring-4 ring-emerald-500/10 transform rotate-0 md:rotate-1 hover:rotate-0 transition-transform duration-300">
       {/* Phone Notch */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-4 bg-neutral-800 rounded-b-xl z-20" />
 
