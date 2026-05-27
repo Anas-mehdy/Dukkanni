@@ -205,20 +205,15 @@ function TopHeader() {
     >
       {/* Logo wordmark */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <div
+        <img
+          src="/logo.png"
+          alt="دكاني"
           style={{
-            width:        "32px",
             height:       "32px",
-            borderRadius: "var(--radius-sm)",
-            background:   "var(--color-primary)",
-            display:      "flex",
-            alignItems:   "center",
-            justifyContent: "center",
-            fontSize:     "1.1rem",
+            width:        "auto",
+            objectFit:    "contain",
           }}
-        >
-          🏪
-        </div>
+        />
         <span
           style={{
             fontFamily: "var(--font-cairo), sans-serif",

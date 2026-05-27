@@ -59,8 +59,17 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       />
 
       {/* Brand mark */}
-      <div style={{ textAlign: "center", marginBottom: "1.5rem", position: "relative" }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "0.25rem" }}>🏪</div>
+      <div style={{ textAlign: "center", marginBottom: "1.5rem", position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <img
+          src="/logo.png"
+          alt="دكاني"
+          style={{
+            height:       "48px",
+            width:        "auto",
+            objectFit:    "contain",
+            marginBottom: "0.5rem",
+          }}
+        />
         <p
           style={{
             fontSize:      "1.375rem",

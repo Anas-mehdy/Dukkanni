@@ -27,9 +27,9 @@ export default async function RootPage() {
       <header className="sticky top-0 z-50 w-full bg-[var(--color-bg)]/80 backdrop-blur-md border-b border-[var(--color-border)]/60 transition-colors duration-200">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="text-xl font-extrabold text-[var(--color-text)] flex items-center gap-1 select-none">
-            <span>دكاني</span>
-            <span className="text-emerald-400 text-lg">⚡</span>
+          <Link href="/" className="flex items-center gap-2 select-none">
+            <img src="/logo.png" alt="دكاني" className="h-8 w-auto object-contain" />
+            <span className="text-xl font-extrabold text-[var(--color-text)]">دكاني</span>
           </Link>
 
           {/* Navigation Links */}
@@ -403,9 +403,9 @@ export default async function RootPage() {
       {/* ── 7. FOOTER SECTION ── */}
       <footer className="border-t border-[var(--color-border)]/60 py-10 bg-[var(--color-bg)] text-center select-none text-xs sm:text-sm text-[var(--color-text-muted)]">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-[var(--color-text)] font-extrabold flex items-center gap-1">
+          <div className="flex items-center gap-2 text-[var(--color-text)] font-extrabold">
+            <img src="/logo.png" alt="دكاني" className="h-6 w-auto object-contain" />
             <span>دكاني</span>
-            <span className="text-emerald-400">⚡</span>
           </div>
           <p>حقوق الطبع محفوظة © 2026 دكاني. صُنع بحب لدعم التجارة المحلية.</p>
         </div>

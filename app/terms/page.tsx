@@ -61,20 +61,15 @@ export default function TermsPage() {
               marginBottom: "1rem",
             }}
           >
-            <div
+            <img
+              src="/logo.png"
+              alt="دكاني"
               style={{
-                width: "36px",
                 height: "36px",
-                borderRadius: "var(--radius-sm)",
-                background: "var(--color-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.2rem",
+                width: "auto",
+                objectFit: "contain",
               }}
-            >
-              🏪
-            </div>
+            />
             <span
               style={{
                 fontWeight: 900,
@@ -82,7 +77,7 @@ export default function TermsPage() {
                 color: "var(--color-text)",
               }}
             >
-              دكاني <span style={{ color: "var(--color-primary)" }}>⚡</span>
+              دكاني
             </span>
           </Link>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--color-text)", margin: 0 }}>
