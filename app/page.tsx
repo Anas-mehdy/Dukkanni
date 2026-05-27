@@ -18,7 +18,7 @@ export default async function RootPage() {
   const navText = isAuthenticated ? "لوحة التحكم" : "دخول التاجر";
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] selection:bg-emerald-500/30 selection:text-emerald-400 overflow-x-hidden font-cairo transition-colors duration-200">
+    <div className="relative min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] selection:bg-emerald-500/30 selection:text-emerald-400 overflow-x-hidden font-cairo transition-colors duration-200">
       {/* Background Decorative Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] right-[-10%] w-[45vw] h-[45vw] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
