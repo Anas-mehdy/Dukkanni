@@ -462,28 +462,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
             <span>{cart.hydrated ? cart.totalItems : 0}</span>
           </Link>
 
-          {/* Back arrow to Admin Dashboard */}
-          <Link
-            href="/dashboard"
-            style={{
-              display:        "inline-flex",
-              alignItems:     "center",
-              gap:            "2px",
-              fontSize:       "0.75rem",
-              fontWeight:     800,
-              color:          "var(--color-text-muted)",
-              textDecoration: "none",
-              border:         "1.5px solid var(--color-border)",
-              borderRadius:   "var(--radius-full)",
-              padding:        "0.4rem 0.625rem",
-              background:     "var(--color-surface-2)"
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}>
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-            الإدارة
-          </Link>
+
 
         </div>
       </header>
