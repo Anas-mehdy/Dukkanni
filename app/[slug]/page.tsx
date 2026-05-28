@@ -115,7 +115,7 @@ export default async function StorePage({
   // ── Fetch active products ─────────────────────────────────────────────────
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, image_url, is_active, sort_order, category_id")
+    .select("id, name, price, image_url, is_active, sort_order, category_id, options")
     .eq("store_id", store.id)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })

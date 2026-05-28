@@ -154,16 +154,65 @@ function ProductCard({
         <span style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", fontWeight: 600 }}>
           {t.piece}
         </span>
-        <p
-          style={{
-            fontSize:   "1rem",
-            fontWeight: 800,
-            color:      "var(--color-success)",
-            lineHeight: 1
-          }}
-        >
-          {currencySymbol}{product.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
+        {(() => {
+          const opts = (product.options as any[]) ?? [];
+          const hasCustomOptionPrices = opts.some((opt) => opt.hasCustomPrice && opt.values?.length > 0);
+          
+          if (hasCustomOptionPrices) {
+            let minPrice: number | null = null;
+            for (const opt of opts) {
+              if (opt.hasCustomPrice && opt.values) {
+                for (const v of opt.values) {
+                  if (v.price != null) {
+                    const priceVal = product.price + v.price;
+                    if (minPrice === null || priceVal < minPrice) {
+                      minPrice = priceVal;
+                    }
+                  }
+                }
+              }
+            }
+
+            if (minPrice !== null) {
+              const formattedMinPrice = minPrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const labelText = lang === "ar" 
+                ? `تبدأ من ${currencySymbol}${formattedMinPrice}` 
+                : lang === "tr" 
+                ? `${currencySymbol}${formattedMinPrice}'den başlayan` 
+                : `Starts from ${currencySymbol}${formattedMinPrice}`;
+              
+              return (
+                <p
+                  style={{
+                    fontSize:   "0.8125rem",
+                    fontWeight: 800,
+                    color:      "var(--color-success)",
+                    lineHeight: 1.1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }}
+                  title={labelText}
+                >
+                  {labelText}
+                </p>
+              );
+            }
+          }
+
+          return (
+            <p
+              style={{
+                fontSize:   "1rem",
+                fontWeight: 800,
+                color:      "var(--color-success)",
+                lineHeight: 1
+              }}
+            >
+              {currencySymbol}{product.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          );
+        })()}
       </div>
 
       {/* Sleek Pill quantitative adjuster stepper [- 0 +] (visible by default) */}

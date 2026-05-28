@@ -189,10 +189,11 @@ export default function ProductForm({ product }: ProductFormProps) {
       errs.name = `الاسم لا يتجاوز ${PRODUCT_NAME_MAX_CHARS} حرفاً`;
     }
 
+    const hasCustomOptionPrices = form.options.some((opt) => opt.hasCustomPrice && opt.values.length > 0);
     const priceNum = parseFloat(form.price);
-    if (form.price === "" || isNaN(priceNum)) {
+    if (!hasCustomOptionPrices && (form.price === "" || isNaN(priceNum))) {
       errs.price = "السعر مطلوب";
-    } else if (priceNum < 0) {
+    } else if (form.price !== "" && !isNaN(priceNum) && priceNum < 0) {
       errs.price = "السعر لا يقل عن 0";
     }
 
@@ -219,7 +220,7 @@ export default function ProductForm({ product }: ProductFormProps) {
     try {
       const payload = {
         name:        form.name.trim(),
-        price:       parseFloat(form.price),
+        price:       form.price === "" ? 0 : parseFloat(form.price),
         category_id: form.category_id || null,
         is_active:   form.is_active,
         sort_order:  parseInt(form.sort_order, 10) || 0,
@@ -260,6 +261,7 @@ export default function ProductForm({ product }: ProductFormProps) {
 
   const nameLength = form.name.length;
   const nameNearLimit = nameLength > 50;
+  const hasCustomOptionPrices = form.options.some((opt) => opt.hasCustomPrice && opt.values.length > 0);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -357,7 +359,7 @@ export default function ProductForm({ product }: ProductFormProps) {
         {/* Price */}
         <div>
           <label htmlFor="product-price" style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: "0.375rem" }}>
-            السعر بالليرة التركية <span style={{ color: "var(--color-danger)" }}>*</span>
+            السعر بالليرة التركية {!hasCustomOptionPrices && <span style={{ color: "var(--color-danger)" }}>*</span>}
           </label>
           <div style={{ position: "relative" }}>
             <input
@@ -392,6 +394,11 @@ export default function ProductForm({ product }: ProductFormProps) {
           {errors.price && (
             <p style={{ color: "var(--color-danger)", fontSize: "0.8125rem", marginTop: "0.25rem" }}>
               {errors.price}
+            </p>
+          )}
+          {hasCustomOptionPrices && (
+            <p style={{ color: "var(--color-text-faint)", fontSize: "0.75rem", marginTop: "0.375rem" }}>
+              💡 بما أنك حددت أسعاراً مخصصة للخيارات بالأسفل، يمكنك ترك السعر الأساسي فارغاً أو 0.
             </p>
           )}
         </div>
