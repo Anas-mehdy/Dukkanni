@@ -39,6 +39,7 @@ interface ProductOption {
   name: string;
   hasCustomPrice: boolean;
   values: ProductOptionValue[];
+  rawInputText?: string;
 }
 
 interface FormState {
@@ -75,7 +76,10 @@ export default function ProductForm({ product }: ProductFormProps) {
     is_active:   product?.is_active   ?? true,
     sort_order:  product?.sort_order  != null ? String(product.sort_order) : "0",
     image_url:   product?.image_url   ?? null,
-    options:     (product?.options as unknown as ProductOption[]) ?? [],
+    options:     ((product?.options as unknown as ProductOption[]) ?? []).map((opt) => ({
+      ...opt,
+      rawInputText: opt.values ? opt.values.map((v) => v.value).join(", ") : "",
+    })),
   });
 
   const addOption = () => {
@@ -83,7 +87,7 @@ export default function ProductForm({ product }: ProductFormProps) {
       ...prev,
       options: [
         ...prev.options,
-        { name: "", hasCustomPrice: false, values: [] },
+        { name: "", hasCustomPrice: false, values: [], rawInputText: "" },
       ],
     }));
   };
@@ -145,7 +149,7 @@ export default function ProductForm({ product }: ProductFormProps) {
       };
     });
 
-    updateOption(index, { values: newValues });
+    updateOption(index, { values: newValues, rawInputText: rawText });
   };
 
   const [errors, setErrors]       = useState<FormErrors>({});
@@ -220,7 +224,9 @@ export default function ProductForm({ product }: ProductFormProps) {
         is_active:   form.is_active,
         sort_order:  parseInt(form.sort_order, 10) || 0,
         image_url:   form.image_url ?? null,
-        options:     form.options.filter((opt) => opt.name.trim().length > 0 && opt.values.length > 0),
+        options:     form.options
+          .filter((opt) => opt.name.trim().length > 0 && opt.values.length > 0)
+          .map(({ name, hasCustomPrice, values }) => ({ name, hasCustomPrice, values })),
       };
 
       const url    = isEdit ? `/api/products?id=${product!.id}` : "/api/products";
@@ -478,7 +484,7 @@ export default function ProductForm({ product }: ProductFormProps) {
                     type="text"
                     className="input-base"
                     placeholder="مثال: 100 مل, 200 مل, 500 مل"
-                    value={opt.values.map((v) => v.value).join(", ")}
+                    value={opt.rawInputText ?? opt.values.map((v) => v.value).join(", ")}
                     onChange={(e) => handleValuesChange(optIdx, e.target.value)}
                     disabled={saving}
                     style={{ fontSize: "0.875rem", padding: "0.625rem 0.875rem" }}
