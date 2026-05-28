@@ -22,21 +22,19 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   // Signs out server-side and instructs @supabase/ssr to clear all
   // auth cookies via Set-Cookie headers on the response.
   await supabase.auth.signOut();
 
-  // Redirect to /login — the browser follows this with cleared cookies.
+  // Redirect to /login — dynamically constructed from request.url to match production domain
   return Response.redirect(
-    new URL(
-      "/login",
-      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-    ),
+    new URL("/login", request.url),
     302
   );
 }
