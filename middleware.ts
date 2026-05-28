@@ -93,6 +93,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   ]);
 
   if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain) && !pathname.startsWith("/api") && !STATIC_SKIP_REGEX.test(pathname)) {
+    // Prevent double rewrites if the path already starts with the subdomain (e.g. /jasmine/checkout or /jasmine)
+    if (pathname === `/${subdomain}` || pathname.startsWith(`/${subdomain}/`)) {
+      return NextResponse.next();
+    }
     const rewriteUrl = new URL(`/${subdomain}${pathname}${request.nextUrl.search}`, request.url);
     return NextResponse.rewrite(rewriteUrl);
   }
