@@ -51,7 +51,7 @@ interface OrderResult {
 
 function formatPrice(amount: number, currencySymbol: string, lang: "ar" | "tr" | "en"): string {
   const formatted = amount.toLocaleString(
-    lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US",
+    lang === "tr" ? "tr-TR" : "en-US",
     { minimumFractionDigits: 2, maximumFractionDigits: 2 }
   );
   return `${formatted} ${currencySymbol}`;
@@ -677,7 +677,7 @@ export default function CheckoutPage({
                         )}
 
                         <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "3px" }}>
-                          {item.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}
+                          {item.price.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}
                         </p>
                       </div>
                     </div>
@@ -708,7 +708,7 @@ export default function CheckoutPage({
                         whiteSpace:  "nowrap",
                       }}
                     >
-                      {lineTotal.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")}
+                      {lineTotal.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                       <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginInlineStart: "2px" }}>
                         {currencySymbol}
                       </span>

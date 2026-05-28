@@ -174,7 +174,7 @@ function ProductCard({
             }
 
             if (minPrice !== null) {
-              const formattedMinPrice = minPrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const formattedMinPrice = minPrice.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               const labelText = lang === "ar" 
                 ? `تبدأ من ${currencySymbol}${formattedMinPrice}` 
                 : lang === "tr" 
@@ -209,7 +209,7 @@ function ProductCard({
                 lineHeight: 1
               }}
             >
-              {currencySymbol}{product.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currencySymbol}{product.price.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           );
         })()}
@@ -1047,7 +1047,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
             <span>{t.checkoutBtn}</span>
 
             <span style={{ fontWeight: 800 }}>
-              {cart.totalPrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
+              {cart.totalPrice.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
             </span>
           </Link>
 
@@ -1231,7 +1231,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                   }}
                 >
                   {t.optionsConfirmBtn
-                    .replace("{price}", cumulativePrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 }))
+                    .replace("{price}", cumulativePrice.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 }))
                     .replace("{symbol}", currencySymbol)}
                 </button>
               </div>
