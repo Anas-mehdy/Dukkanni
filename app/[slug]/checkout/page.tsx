@@ -173,6 +173,9 @@ export default function CheckoutPage({
     return (
       <div
         style={{
+          width:          "100%",
+          maxWidth:       "480px",
+          margin:         "0 auto",
           minHeight:      "100dvh",
           display:        "flex",
           flexDirection:  "column",
@@ -309,6 +312,9 @@ export default function CheckoutPage({
     return (
       <div
         style={{
+          width:         "100%",
+          maxWidth:      "480px",
+          margin:        "0 auto",
           minHeight:     "100dvh",
           background:    "var(--color-bg)",
           fontFamily:    lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
@@ -317,8 +323,6 @@ export default function CheckoutPage({
           flexDirection: "column",
           alignItems:    "center",
           padding:       "2rem 1.25rem",
-          maxWidth:      "480px",
-          margin:        "0 auto",
         }}
       >
         {/* Success icon */}
@@ -417,12 +421,13 @@ export default function CheckoutPage({
   return (
     <div
       style={{
+        width:       "100%",
+        maxWidth:    "480px",
+        margin:      "0 auto",
         minHeight:   "100dvh",
         background:  "var(--color-bg)",
         fontFamily:  lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
         direction:   t.dir,
-        maxWidth:    "480px",
-        margin:      "0 auto",
         paddingBottom: "2rem",
       }}
     >

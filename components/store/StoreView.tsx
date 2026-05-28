@@ -391,12 +391,13 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   return (
     <div
       style={{
+        width:      "100%",
+        maxWidth:   "600px",
+        margin:     "0 auto",
         minHeight:  "100dvh",
         background: "var(--color-bg)",
         fontFamily: lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
         direction:  t.dir,
-        maxWidth:   "600px",
-        margin:     "0 auto",
         position:   "relative",
       }}
     >
