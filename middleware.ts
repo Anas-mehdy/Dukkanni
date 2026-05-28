@@ -72,6 +72,31 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
+  // ── Subdomain Routing Rewrite ──────────────────────────────────────────────
+  const hostname = request.headers.get("host") || "";
+  const currentHost = hostname.replace("www.", "");
+
+  let subdomain = "";
+  if (currentHost.endsWith(".dukkanni.com")) {
+    subdomain = currentHost.replace(".dukkanni.com", "");
+  } else if (currentHost.endsWith(".localhost:3000")) {
+    subdomain = currentHost.replace(".localhost:3000", "");
+  }
+
+  const RESERVED_SUBDOMAINS = new Set([
+    "admin", "api", "auth", "dashboard", "login", "register",
+    "signup", "logout", "settings", "account", "billing",
+    "help", "support", "terms", "privacy", "about", "contact",
+    "dukkanni", "www", "mail", "app", "store", "shop",
+    "demo", "test", "dev", "staging", "prod", "static",
+    "assets", "images", "media", "cdn", "health", "status",
+  ]);
+
+  if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain) && !pathname.startsWith("/api") && !STATIC_SKIP_REGEX.test(pathname)) {
+    const rewriteUrl = new URL(`/${subdomain}${pathname}${request.nextUrl.search}`, request.url);
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
   // ── 1. Rate-limit: POST /api/orders ────────────────────────────────────────
   if (pathname === RATE_LIMIT_PATH && request.method === "POST") {
     const rl = checkRateLimit(request);

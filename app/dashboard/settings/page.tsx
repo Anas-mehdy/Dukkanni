@@ -397,10 +397,7 @@ export default function SettingsPage() {
                 textAlign:    "left",
               }}
             >
-              <span style={{ color: "var(--color-text-faint)" }}>🌐</span>
-              <span style={{ color: "var(--color-text-faint)" }}>
-                {APP_URL.replace("https://", "")}/
-              </span>
+              <span style={{ color: "var(--color-text-faint)" }}>🌐 </span>
               <span
                 style={{
                   color:       slug ? "var(--color-primary)" : "var(--color-text-faint)",
@@ -408,6 +405,9 @@ export default function SettingsPage() {
                 }}
               >
                 {slug || "your-slug"}
+              </span>
+              <span style={{ color: "var(--color-text-faint)" }}>
+                {APP_URL.includes("localhost") ? ".localhost:3000" : ".dukkanni.com"}
               </span>
             </div>
           </div>

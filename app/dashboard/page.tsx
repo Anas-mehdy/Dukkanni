@@ -13,7 +13,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 
@@ -92,9 +92,15 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
-  const storeUrl = store
-    ? `${process.env.NEXT_PUBLIC_APP_URL ?? "https://dukkanni.com"}/${store.slug}`
-    : null;
+  const storeUrl = useMemo(() => {
+    if (!store) return null;
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://dukkanni.com";
+    if (base.includes("localhost")) {
+      return `http://${store.slug}.localhost:3000`;
+    }
+    const cleanBase = base.replace(/^https?:\/\//, "").replace(/^www\./, "");
+    return `https://${store.slug}.${cleanBase}`;
+  }, [store]);
 
   const handleCopyLink = async () => {
     if (!storeUrl) return;

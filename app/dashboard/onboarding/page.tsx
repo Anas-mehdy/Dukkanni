@@ -418,9 +418,12 @@ export default function OnboardingPage() {
                 textAlign:   "left",
               }}
             >
-              <span style={{ color: "var(--color-text-faint)" }}>🌐 {APP_URL.replace("https://", "")}/</span>
+              <span style={{ color: "var(--color-text-faint)" }}>🌐 </span>
               <span style={{ color: slug ? "var(--color-primary)" : "var(--color-text-faint)", fontWeight: slug ? 700 : 400 }}>
                 {slug || "your-slug"}
+              </span>
+              <span style={{ color: "var(--color-text-faint)" }}>
+                {APP_URL.includes("localhost") ? ".localhost:3000" : ".dukkanni.com"}
               </span>
             </div>
 
