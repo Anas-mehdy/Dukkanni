@@ -122,6 +122,11 @@ export default function CheckoutPage({
 
   const t = mounted ? locales[lang] : locales["ar"];
 
+  const handleLangChange = (newLang: "ar" | "tr" | "en") => {
+    setLang(newLang);
+    localStorage.setItem("dukkanni_store_lang", newLang);
+  };
+
   // Global document direction synchronization (fixes layout off-center/tilting-left bugs globally)
   useEffect(() => {
     if (!mounted) return;
@@ -436,8 +441,8 @@ export default function CheckoutPage({
         style={{
           display:        "flex",
           alignItems:     "center",
-          gap:            "0.75rem",
-          padding:        "1rem",
+          justifyContent: "space-between",
+          padding:        "0.75rem 1rem",
           background:     "var(--color-surface)",
           borderBottom:   "1px solid var(--color-border)",
           position:       "sticky",
@@ -445,18 +450,66 @@ export default function CheckoutPage({
           zIndex:         50,
         }}
       >
-        <Link
-          href={`/${slug}`}
-          aria-label={t.backToStore}
-          style={{ color: "var(--color-text-muted)", display: "flex", textDecoration: "none" }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points={t.dir === "rtl" ? "9 18 15 12 9 6" : "15 18 9 12 15 6"}/>
-          </svg>
-        </Link>
-        <h1 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--color-text)" }}>
-          {t.invoiceHeading}
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Link
+            href={`/${slug}`}
+            aria-label={t.backToStore}
+            style={{ color: "var(--color-text-muted)", display: "flex", textDecoration: "none" }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points={t.dir === "rtl" ? "9 18 15 12 9 6" : "15 18 9 12 15 6"}/>
+            </svg>
+          </Link>
+          <h1 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--color-text)" }}>
+            {t.invoiceHeading}
+          </h1>
+        </div>
+
+        {/* Language Switcher */}
+        <div style={{ position: "relative", display: "inline-block", direction: "ltr" }}>
+          <select
+            value={lang}
+            onChange={(e) => handleLangChange(e.target.value as "ar" | "tr" | "en")}
+            style={{
+              appearance: "none",
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              background: "var(--color-surface-2)",
+              color: "var(--color-text)",
+              border: "1.5px solid var(--color-border)",
+              borderRadius: "var(--radius-full)",
+              padding: "0.4rem 1.4rem 0.4rem 0.65rem",
+              fontFamily: "inherit",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              outline: "none",
+              transition: "all 0.2s",
+              display: "flex",
+              alignItems: "center",
+              textAlign: "left",
+            }}
+          >
+            <option value="ar">العربية</option>
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
+          <span
+            style={{
+              position: "absolute",
+              top: "50%",
+              right: "7px",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+              fontSize: "0.5rem",
+              color: "var(--color-text-faint)",
+              display: "flex",
+              alignItems: "center"
+            }}
+          >
+            ▼
+          </span>
+        </div>
       </header>
 
       <div style={{ padding: "1rem" }}>
