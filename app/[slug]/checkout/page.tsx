@@ -105,8 +105,11 @@ export default function CheckoutPage({
   const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
   const [mounted, setMounted] = useState(false);
 
-  // Translation caching states
-  const [translatedItemNames, setTranslatedItemNames] = useState<Record<string, string>>({});
+  // Translation caching states (scoped by language: 'tr' and 'en')
+  const [translatedItemNames, setTranslatedItemNames] = useState<Record<"tr" | "en", Record<string, string>>>({
+    tr: {},
+    en: {}
+  });
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
 
   useEffect(() => {
@@ -116,6 +119,15 @@ export default function CheckoutPage({
     }
     setMounted(true);
   }, []);
+
+  const t = mounted ? locales[lang] : locales["ar"];
+
+  // Global document direction synchronization (fixes layout off-center/tilting-left bugs globally)
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.dir = t.dir;
+    document.documentElement.lang = lang;
+  }, [lang, mounted, t.dir]);
 
   // Effect to automatically translate cart items when language switches on checkout
   useEffect(() => {
@@ -139,12 +151,12 @@ export default function CheckoutPage({
         const json = await response.json();
         const translatedArray: string[] = json.translations;
 
-        const itemTranslations: Record<string, string> = { ...translatedItemNames };
+        const itemTranslations: Record<string, string> = {};
         cart.items.forEach((item, index) => {
           itemTranslations[item.productId] = translatedArray[index] || item.name;
         });
 
-        setTranslatedItemNames(itemTranslations);
+        setTranslatedItemNames((prev) => ({ ...prev, [lang]: itemTranslations }));
         setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
       } catch (err) {
         console.error("Cart items translation failed:", err);
@@ -154,7 +166,6 @@ export default function CheckoutPage({
     performTranslation();
   }, [lang, mounted, cart.items]);
 
-  const t = mounted ? locales[lang] : locales["ar"];
   const currencySymbol = getCurrencySymbol("TRY"); // Resolved properly after order
 
   // ── Empty cart redirect ───────────────────────────────────────────────────
@@ -261,7 +272,7 @@ export default function CheckoutPage({
       const translatedItemsForWA = order.items.map((i) => {
         // Find the matching cart item to extract its product ID for translated name lookup
         const cartItem = cart.items.find((ci) => ci.name === i.name);
-        const translatedName = cartItem ? (translatedItemNames[cartItem.productId] || i.name) : i.name;
+        const translatedName = lang === "ar" ? i.name : (cartItem ? (translatedItemNames[lang]?.[cartItem.productId] || i.name) : i.name);
         return {
           ...i,
           name: translatedName,
@@ -535,7 +546,7 @@ export default function CheckoutPage({
                             WebkitBoxOrient: "vertical",
                           }}
                         >
-                          {translatedItemNames[item.productId] ?? item.name}
+                          {lang === "ar" ? item.name : (translatedItemNames[lang]?.[item.productId] ?? item.name)}
                         </p>
                         <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "1px" }}>
                           {item.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}

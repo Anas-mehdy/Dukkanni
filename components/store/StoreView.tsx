@@ -258,9 +258,15 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
   const [mounted, setMounted] = useState(false);
 
-  // Translation caching states
-  const [translatedCategories, setTranslatedCategories] = useState<Record<string, string>>({});
-  const [translatedProducts, setTranslatedProducts] = useState<Record<string, string>>({});
+  // Translation caching states (scoped by language: 'tr' and 'en')
+  const [translatedCategories, setTranslatedCategories] = useState<Record<"tr" | "en", Record<string, string>>>({
+    tr: {},
+    en: {}
+  });
+  const [translatedProducts, setTranslatedProducts] = useState<Record<"tr" | "en", Record<string, string>>>({
+    tr: {},
+    en: {}
+  });
   const [translating, setTranslating] = useState(false);
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
 
@@ -271,6 +277,15 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     }
     setMounted(true);
   }, []);
+
+  const t = mounted ? locales[lang] : locales["ar"];
+
+  // Global document direction synchronization (fixes layout off-center/tilting-left bugs globally)
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.dir = t.dir;
+    document.documentElement.lang = lang;
+  }, [lang, mounted, t.dir]);
 
   // Effect to automatically translate category & product names when language switches
   useEffect(() => {
@@ -298,8 +313,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
         const json = await response.json();
         const translatedArray: string[] = json.translations;
 
-        const catTranslations: Record<string, string> = { ...translatedCategories };
-        const prodTranslations: Record<string, string> = { ...translatedProducts };
+        const catTranslations: Record<string, string> = {};
+        const prodTranslations: Record<string, string> = {};
 
         let index = 0;
         categories.forEach((c) => {
@@ -312,8 +327,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           index++;
         });
 
-        setTranslatedCategories(catTranslations);
-        setTranslatedProducts(prodTranslations);
+        setTranslatedCategories((prev) => ({ ...prev, [lang]: catTranslations }));
+        setTranslatedProducts((prev) => ({ ...prev, [lang]: prodTranslations }));
         setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
       } catch (err) {
         console.error("Catalog translation failed:", err);
@@ -329,8 +344,6 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     setLang(newLang);
     localStorage.setItem("dukkanni_store_lang", newLang);
   };
-
-  const t = mounted ? locales[lang] : locales["ar"];
 
   // Group products by category
   const groupedProducts = useMemo(() => {
@@ -650,7 +663,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
             {categories.map((cat) => {
               const isActive = activeCategory === cat.id;
-              const catName = translatedCategories[cat.id] ?? cat.name;
+              const catName = lang === "ar" ? cat.name : (translatedCategories[lang]?.[cat.id] ?? cat.name);
               return (
                 <button
                   key={cat.id}
@@ -705,7 +718,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
             {/* 1. Categorized Groups */}
             {groupedProducts.map((group) => {
               const catEmoji = getCategoryEmoji(group.name);
-              const catName = translatedCategories[group.id] ?? group.name;
+              const catName = lang === "ar" ? group.name : (translatedCategories[lang]?.[group.id] ?? group.name);
               return (
                 <section key={group.id} style={{ marginBottom: "1.5rem" }}>
                   
@@ -765,7 +778,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                     }}
                   >
                     {group.products.map((product) => {
-                      const translatedName = translatedProducts[product.id] ?? product.name;
+                      const translatedName = lang === "ar" ? product.name : (translatedProducts[lang]?.[product.id] ?? product.name);
                       return (
                         <ProductCard
                           key={product.id}
@@ -807,7 +820,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                 {/* 2-Column Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", paddingInline: "1rem" }}>
                   {uncategorizedProducts.map((product) => {
-                    const translatedName = translatedProducts[product.id] ?? product.name;
+                    const translatedName = lang === "ar" ? product.name : (translatedProducts[lang]?.[product.id] ?? product.name);
                     return (
                       <ProductCard
                         key={product.id}
