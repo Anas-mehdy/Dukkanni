@@ -134,7 +134,7 @@ export default function ProductForm({ product }: ProductFormProps) {
   };
 
   const handleValuesChange = (index: number, rawText: string) => {
-    const inputNames = rawText.split(",").map((v) => v.trim()).filter((v) => v.length > 0);
+    const inputNames = rawText.split(/[,،]/).map((v) => v.trim()).filter((v) => v.length > 0);
     const currentValues = form.options[index].values;
     
     const newValues = inputNames.map((name) => {
