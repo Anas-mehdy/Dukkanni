@@ -14,12 +14,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/hooks/useCart";
 import { getCurrencySymbol } from "@/lib/constants";
 import { useTheme } from "@/hooks/useTheme";
 import type { CategoryRow, ProductRow, StoreRow } from "@/types/database";
+import { locales } from "@/lib/locales";
 
 // ---------------------------------------------------------------------------
 // Types & Interfaces
@@ -58,6 +59,8 @@ function ProductCard({
   onAdd,
   onIncrement,
   onDecrement,
+  t,
+  lang,
 }: {
   product:       StoreViewProps["products"][number];
   currencySymbol: string;
@@ -65,6 +68,8 @@ function ProductCard({
   onAdd:         () => void;
   onIncrement:   () => void;
   onDecrement:   () => void;
+  t:             any;
+  lang:          string;
 }) {
   return (
     <div
@@ -125,7 +130,7 @@ function ProductCard({
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
             <span style={{ fontSize: "1.75rem", opacity: 0.25 }}>📦</span>
             <span style={{ fontSize: "0.625rem", color: "var(--color-text-faint)", fontWeight: 700 }}>
-              لا توجد صورة
+              {t.noImage}
             </span>
           </div>
         )}
@@ -147,7 +152,7 @@ function ProductCard({
           {product.name}
         </p>
         <span style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", fontWeight: 600 }}>
-          القطعة
+          {t.piece}
         </span>
         <p
           style={{
@@ -157,7 +162,7 @@ function ProductCard({
             lineHeight: 1
           }}
         >
-          {currencySymbol}{product.price.toLocaleString("ar", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {currencySymbol}{product.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
 
@@ -177,7 +182,7 @@ function ProductCard({
         <button
           onClick={(e) => { e.stopPropagation(); if (quantity > 0) onDecrement(); }}
           disabled={quantity === 0}
-          aria-label="تقليل"
+          aria-label={lang === "ar" ? "تقليل" : lang === "tr" ? "azalt" : "decrease"}
           style={{
             width:        "26px",
             height:       "26px",
@@ -211,7 +216,7 @@ function ProductCard({
 
         <button
           onClick={(e) => { e.stopPropagation(); if (quantity === 0) onAdd(); else onIncrement(); }}
-          aria-label="زيادة"
+          aria-label={lang === "ar" ? "زيادة" : lang === "tr" ? "artır" : "increase"}
           style={{
             width:        "26px",
             height:       "26px",
@@ -248,6 +253,25 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const cart = useCart(store.slug);
   const currencySymbol = getCurrencySymbol(store.currency_code);
+
+  // i18n states
+  const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
+    if (saved && ["ar", "tr", "en"].includes(saved)) {
+      setLang(saved);
+    }
+    setMounted(true);
+  }, []);
+
+  const handleLangChange = (newLang: "ar" | "tr" | "en") => {
+    setLang(newLang);
+    localStorage.setItem("dukkanni_store_lang", newLang);
+  };
+
+  const t = mounted ? locales[lang] : locales["ar"];
 
   // Group products by category
   const groupedProducts = useMemo(() => {
@@ -297,8 +321,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       style={{
         minHeight:  "100dvh",
         background: "var(--color-bg)",
-        fontFamily: "var(--font-cairo), sans-serif",
-        direction:  "rtl",
+        fontFamily: lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+        direction:  t.dir,
         maxWidth:   "600px",
         margin:     "0 auto",
         position:   "relative",
@@ -317,21 +341,21 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           fontWeight: 700,
           color: "var(--color-text-muted)",
           textAlign: "center",
-          direction: "rtl",
+          direction: t.dir,
         }}
       >
         <span>
-          تريد متجراً مشابهاً؟{" "}
+          {t.dukkanniPromo}{" "}
           <a
             href="/"
             style={{
               color: "var(--color-primary)",
               textDecoration: "underline",
               fontWeight: 800,
-              marginRight: "0.25rem",
+              marginInlineStart: "0.25rem",
             }}
           >
-            أنشئ متجرك مع دكاني ⚡
+            {t.dukkanniPromoLink}
           </a>
         </span>
       </div>
@@ -392,18 +416,64 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               {store.name}
             </p>
             <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "2px", fontWeight: 500 }}>
-              كتالوج تجاري ⚡
+              {t.catalogLabel}
             </p>
           </div>
         </div>
 
-        {/* Left side: theme choice + cart + back arrow */}
+        {/* Left side: theme choice + lang switcher + cart + back arrow */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           
+          {/* Language Switcher */}
+          <div style={{ position: "relative", display: "inline-block", direction: "ltr" }}>
+            <select
+              value={lang}
+              onChange={(e) => handleLangChange(e.target.value as "ar" | "tr" | "en")}
+              style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                background: "var(--color-surface-2)",
+                color: "var(--color-text)",
+                border: "1.5px solid var(--color-border)",
+                borderRadius: "var(--radius-full)",
+                padding: "0.4rem 1.4rem 0.4rem 0.65rem",
+                fontFamily: "inherit",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                outline: "none",
+                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                textAlign: "left",
+              }}
+            >
+              <option value="ar">العربية</option>
+              <option value="tr">Türkçe</option>
+              <option value="en">English</option>
+            </select>
+            <span
+              style={{
+                position: "absolute",
+                top: "50%",
+                right: "7px",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                fontSize: "0.5rem",
+                color: "var(--color-text-faint)",
+                display: "flex",
+                alignItems: "center"
+              }}
+            >
+              ▼
+            </span>
+          </div>
+
           {/* Light/Dark Toggle choice */}
           <button
             onClick={toggleTheme}
-            aria-label="تغيير المظهر"
+            aria-label={lang === "ar" ? "تغيير المظهر" : lang === "tr" ? "temayı değiştir" : "change theme"}
             style={{
               width: "36px",
               height: "36px",
@@ -437,7 +507,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           <Link
             href={`/${store.slug}/checkout`}
             id="cart-badge-btn"
-            aria-label="عرض السلة"
+            aria-label={t.cart}
             style={{
               display:        "flex",
               alignItems:     "center",
@@ -448,7 +518,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               border:         "none",
               borderRadius:   "var(--radius-full)",
               padding:        "0.4rem 0.75rem",
-              fontFamily:     "var(--font-cairo), sans-serif",
+              fontFamily:     "inherit",
               fontWeight:     800,
               fontSize:       "0.8125rem",
               textDecoration: "none",
@@ -503,7 +573,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                 border:       "none",
                 background:   activeCategory === "all" ? "var(--color-primary)" : "var(--color-surface-2)",
                 color:        activeCategory === "all" ? "#ffffff" : "var(--color-text-muted)",
-                fontFamily:   "var(--font-cairo), sans-serif",
+                fontFamily:   "inherit",
                 fontWeight:   800,
                 fontSize:     "0.8125rem",
                 cursor:       "pointer",
@@ -515,7 +585,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                 boxShadow:    activeCategory === "all" ? "0 2px 8px var(--color-primary-glow)" : "none"
               }}
             >
-              <span>الكل</span>
+              <span>{t.categoryAll}</span>
               <span>🏪</span>
             </button>
 
@@ -533,7 +603,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                     border:       "none",
                     background:   isActive ? "var(--color-primary)" : "var(--color-surface-2)",
                     color:        isActive ? "#ffffff" : "var(--color-text-muted)",
-                    fontFamily:   "var(--font-cairo), sans-serif",
+                    fontFamily:   "inherit",
                     fontWeight:   800,
                     fontSize:     "0.8125rem",
                     cursor:       "pointer",
@@ -567,7 +637,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           <div style={{ padding: "4rem 1rem", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>📦</div>
             <p style={{ color: "var(--color-text-muted)", fontWeight: 700, fontSize: "0.9375rem" }}>
-              لا توجد منتجات في هذه الفئة حالياً
+              {t.noProducts}
             </p>
           </div>
         ) : (
@@ -610,7 +680,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                         {group.name}
                       </p>
                       <span style={{ fontSize: "0.6875rem", color: "var(--color-text-faint)", fontWeight: 700 }}>
-                        منتج {group.products.length}
+                        {group.products.length} {t.itemsCount}
                       </span>
                     </div>
 
@@ -642,6 +712,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                         onAdd={() => handleAdd(product)}
                         onIncrement={() => handleIncrement(product)}
                         onDecrement={() => handleDecrement(product)}
+                        t={t}
+                        lang={lang}
                       />
                     ))}
                   </div>
@@ -660,9 +732,9 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                     📂
                   </div>
                   <div>
-                    <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--color-text)" }}>غير مصنف</p>
+                    <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--color-text)" }}>{t.uncategorized}</p>
                     <span style={{ fontSize: "0.6875rem", color: "var(--color-text-faint)", fontWeight: 700 }}>
-                      منتج {uncategorizedProducts.length}
+                      {uncategorizedProducts.length} {t.itemsCount}
                     </span>
                   </div>
                   <div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
@@ -679,6 +751,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                       onAdd={() => handleAdd(product)}
                       onIncrement={() => handleIncrement(product)}
                       onDecrement={() => handleDecrement(product)}
+                      t={t}
+                      lang={lang}
                     />
                   ))}
                 </div>
@@ -721,7 +795,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               borderRadius:   "var(--radius-full)",
               padding:        "0.875rem 1.25rem",
               textDecoration: "none",
-              fontFamily:     "var(--font-cairo), sans-serif",
+              fontFamily:     "inherit",
               fontWeight:     800,
               fontSize:       "0.9375rem",
               boxShadow:      "0 4px 16px var(--color-success-muted)",
@@ -729,13 +803,13 @@ export default function StoreView({ store, categories, products }: StoreViewProp
             }}
           >
             <span style={{ background: "rgba(255,255,255,0.2)", borderRadius: "var(--radius-full)", padding: "0.2rem 0.625rem", fontSize: "0.8125rem" }}>
-              {cart.totalItems} منتج
+              {cart.totalItems} {t.itemsCount}
             </span>
 
-            <span>إتمام الطلب عبر واتساب ←</span>
+            <span>{t.checkoutBtn}</span>
 
             <span style={{ fontWeight: 800 }}>
-              {cart.totalPrice.toLocaleString("ar", { minimumFractionDigits: 2 })} {currencySymbol}
+              {cart.totalPrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
             </span>
           </Link>
 

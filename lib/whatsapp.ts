@@ -16,6 +16,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { locales } from "./locales";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -198,45 +200,36 @@ function isValidE164(value: string): boolean {
  * Builds a perfectly structured WhatsApp order message and returns a
  * ready-to-use wa.me deep-link URL.
  *
- * Message format (mirrors the spec in the product brief):
- *
- *   New Order: idelbi gida
- *
- *   Pinar White Cheese 500g (x5)
- *   550 ₺
- *   Ulker Chocolate (x5)
- *   2500 ₺
- *   -----------------------
- *   Total: 3050 ₺
- *   Customer Name: Mohammed
- *
- * If the message exceeds SOFT_LIMIT_CHARS, items are truncated and a
- * warning line is appended. isTruncated will be true in the result.
+ * Message format is adapted to the customer's selected language.
  *
  * @param phoneE164  The merchant's E.164 phone number (from store.whatsapp_e164)
  * @param order      Order details
+ * @param language   Active customer storefront language choice
  */
 export function buildWhatsAppMessage(
   phoneE164: string,
-  order: WhatsAppOrderInput
+  order: WhatsAppOrderInput,
+  language: "ar" | "tr" | "en" = "ar"
 ): WhatsAppMessageResult {
+  const t = locales[language];
   const symbol = getCurrencySymbol(order.currencyCode);
   const separator = "-".repeat(23);
 
-  // Build header line (Arabic)
-  const header = `طلب جديد من متجر: ${order.storeName} 🏪`;
+  // Build header line
+  const header = t.waMessageHeader.replace("{storeName}", order.storeName);
 
   // Build footer (always included — even if items are truncated)
   const footer = [
     separator,
-    `الإجمالي: ${formatAmount(order.totalAmount)} ${symbol}`,
-    `اسم الزبون: ${order.customerName}`,
+    t.waMessageTotal.replace("{total}", formatAmount(order.totalAmount)).replace("{symbol}", symbol),
+    t.waMessageCustomer.replace("{customerName}", order.customerName),
   ].join("\n");
 
   // Build individual item lines
   const itemLines: string[] = order.items.map((item) => {
     const lineTotal  = item.quantity * item.unitPrice;
-    const itemName   = item.name ?? item.productName ?? "منتج";
+    const defaultName = language === "tr" ? "ürün" : language === "en" ? "product" : "منتج";
+    const itemName   = item.name ?? item.productName ?? defaultName;
     return `${itemName} (x${item.quantity})\n${formatAmount(lineTotal)} ${symbol}`;
   });
 
@@ -245,7 +238,8 @@ export function buildWhatsAppMessage(
     header,
     itemLines,
     footer,
-    SOFT_LIMIT_CHARS
+    SOFT_LIMIT_CHARS,
+    t.waMessageTruncated
   );
 
   const message = body;
@@ -273,7 +267,8 @@ function assembleWithLimit(
   header: string,
   itemLines: string[],
   footer: string,
-  limit: number
+  limit: number,
+  truncationNotice: string
 ): { body: string; isTruncated: boolean } {
   const NEWLINE = "\n";
 
@@ -291,7 +286,6 @@ function assembleWithLimit(
   }
 
   // Binary search for how many items fit
-  const truncationNotice = `⚠️ +more items (order too long for WhatsApp preview)`;
   let lo = 0;
   let hi = itemLines.length - 1;
 

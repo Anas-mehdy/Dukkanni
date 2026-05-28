@@ -18,12 +18,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/hooks/useCart";
 import { buildWhatsAppMessage, sanitizePhone } from "@/lib/whatsapp";
 import { getCurrencySymbol } from "@/lib/constants";
+import { locales } from "@/lib/locales";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,8 +49,12 @@ interface OrderResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(amount: number, currencySymbol: string): string {
-  return `${amount.toLocaleString("ar")} ${currencySymbol}`;
+function formatPrice(amount: number, currencySymbol: string, lang: "ar" | "tr" | "en"): string {
+  const formatted = amount.toLocaleString(
+    lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US",
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+  );
+  return `${formatted} ${currencySymbol}`;
 }
 
 /** Delegates to buildWhatsAppMessage (truncation already built-in) */
@@ -59,7 +64,8 @@ function buildSafeWhatsAppUrl(
   customerName: string,
   storeName: string,
   currencyCode: string,
-  totalAmount: number
+  totalAmount: number,
+  language: "ar" | "tr" | "en"
 ): { url: string; isTruncated: boolean } {
   return buildWhatsAppMessage(phone, {
     storeName,
@@ -67,7 +73,7 @@ function buildSafeWhatsAppUrl(
     currencyCode,
     totalAmount,
     items,
-  });
+  }, language);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +101,19 @@ export default function CheckoutPage({
     orderId:      string;
   } | null>(null);
 
+  // i18n states
+  const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
+    if (saved && ["ar", "tr", "en"].includes(saved)) {
+      setLang(saved);
+    }
+    setMounted(true);
+  }, []);
+
+  const t = mounted ? locales[lang] : locales["ar"];
   const currencySymbol = getCurrencySymbol("TRY"); // Resolved properly after order
 
   // ── Empty cart redirect ───────────────────────────────────────────────────
@@ -110,15 +129,16 @@ export default function CheckoutPage({
           padding:        "2rem",
           textAlign:      "center",
           background:     "var(--color-bg)",
-          fontFamily:     "var(--font-cairo), sans-serif",
+          fontFamily:     lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+          direction:      t.dir,
         }}
       >
         <div style={{ fontSize: "3.5rem", marginBottom: "0.75rem" }}>🛒</div>
         <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--color-text)" }}>
-          السلة فارغة
+          {t.emptyCart}
         </h1>
         <p style={{ color: "var(--color-text-muted)", marginTop: "0.5rem", marginBottom: "1.5rem" }}>
-          أضف منتجات أولاً من المتجر
+          {t.emptyCartDesc}
         </p>
         <Link
           href={`/${slug}`}
@@ -132,7 +152,7 @@ export default function CheckoutPage({
             fontSize:       "0.9375rem",
           }}
         >
-          العودة للمتجر
+          {t.backToStore}
         </Link>
       </div>
     );
@@ -144,24 +164,24 @@ export default function CheckoutPage({
 
     // Validate customer name
     if (!customerName.trim()) {
-      setNameError("اسم الزبون مطلوب");
+      setNameError(t.nameRequired);
       return;
     }
     if (customerName.trim().length < 2) {
-      setNameError("الاسم قصير جداً");
+      setNameError(t.nameTooShort);
       return;
     }
 
     // Validate customer phone
     if (!customerPhone.trim()) {
-      setPhoneError("رقم الهاتف مطلوب");
+      setPhoneError(t.phoneRequired);
       return;
     }
 
     // Sanitize customer phone using sanitizePhone() helper
     const sanitizedPhone = sanitizePhone(customerPhone.trim());
     if (!sanitizedPhone) {
-      setPhoneError("رقم الهاتف غير صحيح (مثال: +905321234567)");
+      setPhoneError(t.phoneInvalid);
       return;
     }
 
@@ -189,12 +209,11 @@ export default function CheckoutPage({
       const json = await res.json();
 
       if (!res.ok) {
-        setApiError(json.error ?? "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مجدداً.");
+        setApiError(json.error ?? (lang === "tr" ? "Bir hata oluştu. Lütfen tekrar deneyin." : lang === "en" ? "An error occurred. Please try again." : "حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مجدداً."));
         return;
       }
 
       const order: OrderResult = json.data;
-      const sym = getCurrencySymbol(order.currencyCode);
 
       // ── Step 2: Build WhatsApp message with length guard ────────────────
       const { url, isTruncated: wasTruncated } = buildSafeWhatsAppUrl(
@@ -203,7 +222,8 @@ export default function CheckoutPage({
         order.customerName,
         order.storeName,
         order.currencyCode,
-        order.totalAmount
+        order.totalAmount,
+        lang
       );
 
       // ── Step 3: Clear cart ──────────────────────────────────────────────
@@ -214,10 +234,8 @@ export default function CheckoutPage({
 
       // ── Step 5: Open WhatsApp deep link ─────────────────────────────────
       window.open(url, "_blank");
-
-      void sym; // used in render below
     } catch {
-      setApiError("خطأ في الاتصال. تأكد من اتصالك بالإنترنت وأعد المحاولة.");
+      setApiError(lang === "tr" ? "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin." : lang === "en" ? "Connection error. Please check your internet and try again." : "خطأ في الاتصال. تأكد من اتصالك بالإنترنت وأعد المحاولة.");
     } finally {
       setSubmitting(false);
     }
@@ -230,8 +248,8 @@ export default function CheckoutPage({
         style={{
           minHeight:     "100dvh",
           background:    "var(--color-bg)",
-          fontFamily:    "var(--font-cairo), sans-serif",
-          direction:     "rtl",
+          fontFamily:    lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+          direction:     t.dir,
           display:       "flex",
           flexDirection: "column",
           alignItems:    "center",
@@ -260,12 +278,12 @@ export default function CheckoutPage({
         </div>
 
         <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "var(--color-text)", marginBottom: "0.5rem", textAlign: "center" }}>
-          تم إنشاء طلبك بنجاح!
+          {t.successTitle}
         </h1>
         <p style={{ color: "var(--color-text-muted)", textAlign: "center", lineHeight: 1.6, marginBottom: "1.75rem" }}>
-          رقم الطلب: <strong style={{ color: "var(--color-text)", fontFamily: "monospace" }}>#{success.orderId.slice(0, 8).toUpperCase()}</strong>
+          {t.orderNumber}: <strong style={{ color: "var(--color-text)", fontFamily: "monospace" }}>#{success.orderId.slice(0, 8).toUpperCase()}</strong>
           <br />
-          واتساب يفتح تلقائياً لإرسال طلبك.
+          {t.successDesc}
         </p>
 
         {/* Truncation warning */}
@@ -282,7 +300,7 @@ export default function CheckoutPage({
               width:        "100%",
             }}
           >
-            ⚠ الطلب كبير — تم اختصار الرسالة تلقائياً. سيظهر إجمالي السعر الصحيح في الرسالة.
+            {t.waTruncatedWarning}
           </div>
         )}
 
@@ -303,7 +321,7 @@ export default function CheckoutPage({
             color:          "#fff",
             borderRadius:   "var(--radius-full)",
             textDecoration: "none",
-            fontFamily:     "var(--font-cairo), sans-serif",
+            fontFamily:     "inherit",
             fontWeight:     800,
             fontSize:       "1.0625rem",
             boxShadow:      "0 4px 16px rgba(37,211,102,0.4)",
@@ -313,7 +331,7 @@ export default function CheckoutPage({
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
           </svg>
-          فتح واتساب وإرسال الطلب
+          {t.openWhatsApp}
         </a>
 
         {/* Back to store */}
@@ -326,7 +344,7 @@ export default function CheckoutPage({
             fontWeight:     600,
           }}
         >
-          العودة للمتجر
+          {t.backToStore}
         </Link>
       </div>
     );
@@ -338,8 +356,8 @@ export default function CheckoutPage({
       style={{
         minHeight:   "100dvh",
         background:  "var(--color-bg)",
-        fontFamily:  "var(--font-cairo), sans-serif",
-        direction:   "rtl",
+        fontFamily:  lang === "ar" ? "var(--font-cairo), sans-serif" : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+        direction:   t.dir,
         maxWidth:    "480px",
         margin:      "0 auto",
         paddingBottom: "2rem",
@@ -361,15 +379,15 @@ export default function CheckoutPage({
       >
         <Link
           href={`/${slug}`}
-          aria-label="رجوع للمتجر"
+          aria-label={t.backToStore}
           style={{ color: "var(--color-text-muted)", display: "flex", textDecoration: "none" }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6"/>
+            <polyline points={t.dir === "rtl" ? "9 18 15 12 9 6" : "15 18 9 12 15 6"}/>
           </svg>
         </Link>
         <h1 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--color-text)" }}>
-          عرض فاتورتك 🧾
+          {t.invoiceHeading}
         </h1>
       </header>
 
@@ -400,9 +418,9 @@ export default function CheckoutPage({
                   letterSpacing: "0.03em",
                 }}
               >
-                <span>المنتج</span>
-                <span style={{ textAlign: "center" }}>الكمية</span>
-                <span style={{ textAlign: "left" }}>المجموع</span>
+                <span>{t.product}</span>
+                <span style={{ textAlign: "center" }}>{t.quantity}</span>
+                <span style={{ textAlign: t.dir === "rtl" ? "left" : "right" }}>{t.total}</span>
               </div>
 
               {/* Item rows */}
@@ -468,7 +486,7 @@ export default function CheckoutPage({
                           {item.name}
                         </p>
                         <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "1px" }}>
-                          {item.price.toLocaleString("ar")} {currencySymbol} × {item.quantity}
+                          {item.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}
                         </p>
                       </div>
                     </div>
@@ -495,12 +513,12 @@ export default function CheckoutPage({
                         fontWeight:  700,
                         fontSize:    "0.9rem",
                         color:       "var(--color-text)",
-                        textAlign:   "left",
+                        textAlign:   t.dir === "rtl" ? "left" : "right",
                         whiteSpace:  "nowrap",
                       }}
                     >
-                      {lineTotal.toLocaleString("ar")}
-                      <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginRight: "2px" }}>
+                      {lineTotal.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")}
+                      <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginInlineStart: "2px" }}>
                         {currencySymbol}
                       </span>
                     </span>
@@ -520,10 +538,10 @@ export default function CheckoutPage({
                 }}
               >
                 <span style={{ fontWeight: 800, fontSize: "0.9375rem", color: "var(--color-text)" }}>
-                  الإجمالي
+                  {t.total}
                 </span>
                 <span style={{ fontWeight: 800, fontSize: "1.125rem", color: "var(--color-primary)" }}>
-                  {formatPrice(cart.totalPrice, currencySymbol)}
+                  {formatPrice(cart.totalPrice, currencySymbol, lang)}
                 </span>
               </div>
             </div>
@@ -543,13 +561,13 @@ export default function CheckoutPage({
                       marginBottom: "0.5rem",
                     }}
                   >
-                    اسم الزبون <span style={{ color: "var(--color-danger)" }}>*</span>
+                    {t.customerName} <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <input
                     id="customer-name"
                     type="text"
                     className={`input-base${nameError ? " input-error" : ""}`}
-                    placeholder="أدخل اسمك الكريم"
+                    placeholder={t.customerNamePlaceholder}
                     value={customerName}
                     onChange={(e) => {
                       setCustomerName(e.target.value);
@@ -560,6 +578,7 @@ export default function CheckoutPage({
                     disabled={submitting}
                     autoFocus
                     autoComplete="name"
+                    style={{ textAlign: t.dir === "rtl" ? "right" : "left" }}
                   />
                   {nameError && (
                     <p style={{ color: "var(--color-danger)", fontSize: "0.8125rem", marginTop: "0.375rem" }}>
@@ -580,13 +599,13 @@ export default function CheckoutPage({
                       marginBottom: "0.5rem",
                     }}
                   >
-                    رقم الهاتف <span style={{ color: "var(--color-danger)" }}>*</span>
+                    {t.phoneNumber} <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <input
                     id="customer-phone"
                     type="tel"
                     className={`input-base${phoneError ? " input-error" : ""}`}
-                    placeholder="مثال: +905321234567"
+                    placeholder={t.phoneNumberPlaceholder}
                     value={customerPhone}
                     onChange={(e) => {
                       setCustomerPhone(e.target.value);
@@ -596,7 +615,7 @@ export default function CheckoutPage({
                     disabled={submitting}
                     autoComplete="tel"
                     dir="ltr"
-                    style={{ textAlign: "right" }}
+                    style={{ textAlign: t.dir === "rtl" ? "right" : "left" }}
                   />
                   {phoneError && (
                     <p style={{ color: "var(--color-danger)", fontSize: "0.8125rem", marginTop: "0.375rem" }}>
@@ -640,7 +659,7 @@ export default function CheckoutPage({
                   color:          submitting ? "var(--color-text-faint)" : "#fff",
                   borderRadius:   "var(--radius-full)",
                   border:         "none",
-                  fontFamily:     "var(--font-cairo), sans-serif",
+                  fontFamily:     "inherit",
                   fontWeight:     800,
                   fontSize:       "1.0625rem",
                   cursor:         submitting ? "not-allowed" : "pointer",
@@ -649,13 +668,13 @@ export default function CheckoutPage({
                 }}
               >
                 {submitting ? (
-                  "جاري إرسال طلبك..."
+                  t.submitting
                 ) : (
                   <>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
                     </svg>
-                    إرسال الفاتورة وتأكيد الطلب
+                    {t.sendInvoice}
                   </>
                 )}
               </button>
@@ -670,7 +689,7 @@ export default function CheckoutPage({
                   lineHeight: 1.5,
                 }}
               >
-                🔒 بضغط الزر، سيُحفظ طلبك وسيفتح واتساب تلقائياً لإتمام التواصل مع المتجر
+                {t.trustNote}
               </p>
             </form>
           </>
