@@ -258,6 +258,12 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
   const [mounted, setMounted] = useState(false);
 
+  // Translation caching states
+  const [translatedCategories, setTranslatedCategories] = useState<Record<string, string>>({});
+  const [translatedProducts, setTranslatedProducts] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState(false);
+  const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
+
   useEffect(() => {
     const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
     if (saved && ["ar", "tr", "en"].includes(saved)) {
@@ -265,6 +271,59 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     }
     setMounted(true);
   }, []);
+
+  // Effect to automatically translate category & product names when language switches
+  useEffect(() => {
+    if (!mounted) return;
+    if (lang === "ar") return; // Arabic is the source of truth
+    if (translatedLangs[lang]) return; // Already translated this language
+
+    const performTranslation = async () => {
+      setTranslating(true);
+      try {
+        const categoryNames = categories.map((c) => c.name);
+        const productNames = products.map((p) => p.name);
+        const allText = [...categoryNames, ...productNames];
+
+        if (allText.length === 0) return;
+
+        const response = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: allText, target: lang }),
+        });
+
+        if (!response.ok) throw new Error("Translation failed");
+
+        const json = await response.json();
+        const translatedArray: string[] = json.translations;
+
+        const catTranslations: Record<string, string> = { ...translatedCategories };
+        const prodTranslations: Record<string, string> = { ...translatedProducts };
+
+        let index = 0;
+        categories.forEach((c) => {
+          catTranslations[c.id] = translatedArray[index] || c.name;
+          index++;
+        });
+
+        products.forEach((p) => {
+          prodTranslations[p.id] = translatedArray[index] || p.name;
+          index++;
+        });
+
+        setTranslatedCategories(catTranslations);
+        setTranslatedProducts(prodTranslations);
+        setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
+      } catch (err) {
+        console.error("Catalog translation failed:", err);
+      } finally {
+        setTranslating(false);
+      }
+    };
+
+    performTranslation();
+  }, [lang, mounted, categories, products]);
 
   const handleLangChange = (newLang: "ar" | "tr" | "en") => {
     setLang(newLang);
@@ -296,10 +355,10 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   }, [activeCategory, products]);
 
   // Cart Handlers
-  const handleAdd = (product: StoreViewProps["products"][number]) => {
+  const handleAdd = (product: StoreViewProps["products"][number], translatedName?: string) => {
     cart.addItem({
       productId: product.id,
-      name:      product.name,
+      name:      translatedName ?? product.name,
       price:     product.price,
       imageUrl:  product.image_url,
     });
@@ -591,6 +650,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
             {categories.map((cat) => {
               const isActive = activeCategory === cat.id;
+              const catName = translatedCategories[cat.id] ?? cat.name;
               return (
                 <button
                   key={cat.id}
@@ -615,7 +675,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                     boxShadow:    isActive ? "0 2px 8px var(--color-primary-glow)" : "none"
                   }}
                 >
-                  <span>{cat.name}</span>
+                  <span>{catName}</span>
                   <span>📦</span>
                 </button>
               );
@@ -645,6 +705,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
             {/* 1. Categorized Groups */}
             {groupedProducts.map((group) => {
               const catEmoji = getCategoryEmoji(group.name);
+              const catName = translatedCategories[group.id] ?? group.name;
               return (
                 <section key={group.id} style={{ marginBottom: "1.5rem" }}>
                   
@@ -677,7 +738,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                     
                     <div style={{ flexShrink: 0 }}>
                       <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--color-text)" }}>
-                        {group.name}
+                        {catName}
                       </p>
                       <span style={{ fontSize: "0.6875rem", color: "var(--color-text-faint)", fontWeight: 700 }}>
                         {group.products.length} {t.itemsCount}
@@ -703,19 +764,22 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                       paddingInline:       "1rem"
                     }}
                   >
-                    {group.products.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        currencySymbol={currencySymbol}
-                        quantity={cart.hydrated ? cart.getQuantity(product.id) : 0}
-                        onAdd={() => handleAdd(product)}
-                        onIncrement={() => handleIncrement(product)}
-                        onDecrement={() => handleDecrement(product)}
-                        t={t}
-                        lang={lang}
-                      />
-                    ))}
+                    {group.products.map((product) => {
+                      const translatedName = translatedProducts[product.id] ?? product.name;
+                      return (
+                        <ProductCard
+                          key={product.id}
+                          product={{ ...product, name: translatedName }}
+                          currencySymbol={currencySymbol}
+                          quantity={cart.hydrated ? cart.getQuantity(product.id) : 0}
+                          onAdd={() => handleAdd(product, translatedName)}
+                          onIncrement={() => handleIncrement(product)}
+                          onDecrement={() => handleDecrement(product)}
+                          t={t}
+                          lang={lang}
+                        />
+                      );
+                    })}
                   </div>
 
                 </section>
@@ -742,19 +806,22 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
                 {/* 2-Column Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", paddingInline: "1rem" }}>
-                  {uncategorizedProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      currencySymbol={currencySymbol}
-                      quantity={cart.hydrated ? cart.getQuantity(product.id) : 0}
-                      onAdd={() => handleAdd(product)}
-                      onIncrement={() => handleIncrement(product)}
-                      onDecrement={() => handleDecrement(product)}
-                      t={t}
-                      lang={lang}
-                    />
-                  ))}
+                  {uncategorizedProducts.map((product) => {
+                    const translatedName = translatedProducts[product.id] ?? product.name;
+                    return (
+                      <ProductCard
+                        key={product.id}
+                        product={{ ...product, name: translatedName }}
+                        currencySymbol={currencySymbol}
+                        quantity={cart.hydrated ? cart.getQuantity(product.id) : 0}
+                        onAdd={() => handleAdd(product, translatedName)}
+                        onIncrement={() => handleIncrement(product)}
+                        onDecrement={() => handleDecrement(product)}
+                        t={t}
+                        lang={lang}
+                      />
+                    );
+                  })}
                 </div>
 
               </section>

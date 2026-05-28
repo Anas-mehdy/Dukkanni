@@ -105,6 +105,10 @@ export default function CheckoutPage({
   const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
   const [mounted, setMounted] = useState(false);
 
+  // Translation caching states
+  const [translatedItemNames, setTranslatedItemNames] = useState<Record<string, string>>({});
+  const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
+
   useEffect(() => {
     const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
     if (saved && ["ar", "tr", "en"].includes(saved)) {
@@ -112,6 +116,43 @@ export default function CheckoutPage({
     }
     setMounted(true);
   }, []);
+
+  // Effect to automatically translate cart items when language switches on checkout
+  useEffect(() => {
+    if (!mounted) return;
+    if (lang === "ar") return; // Source of truth is Arabic
+    if (translatedLangs[lang]) return; // Already translated this language
+
+    const performTranslation = async () => {
+      try {
+        const itemNames = cart.items.map((i) => i.name);
+        if (itemNames.length === 0) return;
+
+        const response = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: itemNames, target: lang }),
+        });
+
+        if (!response.ok) throw new Error("Translation failed");
+
+        const json = await response.json();
+        const translatedArray: string[] = json.translations;
+
+        const itemTranslations: Record<string, string> = { ...translatedItemNames };
+        cart.items.forEach((item, index) => {
+          itemTranslations[item.productId] = translatedArray[index] || item.name;
+        });
+
+        setTranslatedItemNames(itemTranslations);
+        setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
+      } catch (err) {
+        console.error("Cart items translation failed:", err);
+      }
+    };
+
+    performTranslation();
+  }, [lang, mounted, cart.items]);
 
   const t = mounted ? locales[lang] : locales["ar"];
   const currencySymbol = getCurrencySymbol("TRY"); // Resolved properly after order
@@ -216,9 +257,20 @@ export default function CheckoutPage({
       const order: OrderResult = json.data;
 
       // ── Step 2: Build WhatsApp message with length guard ────────────────
+      // Map product names to their translated versions for the WhatsApp payload!
+      const translatedItemsForWA = order.items.map((i) => {
+        // Find the matching cart item to extract its product ID for translated name lookup
+        const cartItem = cart.items.find((ci) => ci.name === i.name);
+        const translatedName = cartItem ? (translatedItemNames[cartItem.productId] || i.name) : i.name;
+        return {
+          ...i,
+          name: translatedName,
+        };
+      });
+
       const { url, isTruncated: wasTruncated } = buildSafeWhatsAppUrl(
         order.storePhone,
-        order.items,
+        translatedItemsForWA,
         order.customerName,
         order.storeName,
         order.currencyCode,
@@ -483,7 +535,7 @@ export default function CheckoutPage({
                             WebkitBoxOrient: "vertical",
                           }}
                         >
-                          {item.name}
+                          {translatedItemNames[item.productId] ?? item.name}
                         </p>
                         <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "1px" }}>
                           {item.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}
