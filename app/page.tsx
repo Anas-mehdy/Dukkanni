@@ -56,8 +56,13 @@ export default async function RootPage() {
       {/* ── 2. HERO SECTION ── */}
       <section className="relative pt-10 pb-20 md:pt-16 md:pb-28 max-w-6xl mx-auto px-4 text-center">
         {/* Banner Announcement */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-extrabold text-emerald-400 mb-6 animate-pulse select-none">
-          <span>🚀 المنصة الأبسط لتجارة الواتساب لعام 2026</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-extrabold text-emerald-400 select-none animate-pulse">
+            <span>🚀 المنصة الأبسط لتجارة الواتساب لعام 2026</span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-extrabold text-emerald-400 select-none">
+            <span>🌐 دعم كامل لـ 3 لغات (AR / TR / EN)</span>
+          </div>
         </div>
 
         {/* Headline */}
@@ -70,7 +75,7 @@ export default async function RootPage() {
 
         {/* Subheadline */}
         <p className="text-sm sm:text-base md:text-lg lg:text-xl text-[var(--color-text-muted)] max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
-          المنصة الأبسط لصغار الكسبة والتجار المحليين. أنشئ كاتالوج منتجاتك خلال 60 ثانية، واستقبل طلبيات زبائنك بفواتير دقيقة ومفصلة مباشرة على حساب الواتساب الخاص بك، بدون تعقيدات شوبيفاي أو مصاريف إضافية.
+          المنصة الأبسط لصغار الكسبة والتجار المحليين. أنشئ كاتالوج منتجاتك خلال 60 ثانية، واستقبل طلبيات زبائنك بفواتير دقيقة مباشرة على الواتساب، مع دعم كامل وفوري لثلاث لغات (العربية، التركية، والإنجليزية) لتخدم جميع عملائك في تركيا وخارجها بضغطة زر.
         </p>
 
         {/* Dual CTAs */}
@@ -105,7 +110,7 @@ export default async function RootPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             {/* Feature 1 */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-emerald-500/40 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1">
               <div className="text-3xl mb-4">📱</div>
@@ -139,6 +144,15 @@ export default async function RootPage() {
               <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">إشعارات وتتبع ذكي</h3>
               <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
                 رنين صوتي حي فور وصول كل طلب جديد لمتجرك، مع إمكانية مشاركة روابط تتبع الشحنات لعملائك بنقرة زر.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-emerald-500/40 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="text-3xl mb-4">🌐</div>
+              <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">متجر بثلاث لغات</h3>
+              <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
+                دعم كامل وفوري لـ 3 لغات (العربية، التركية، والإنجليزية) مع ترجمة تلقائية ذكية للمنتجات لخدمة كافة فئات عملائك في تركيا وخارجها.
               </p>
             </div>
           </div>
