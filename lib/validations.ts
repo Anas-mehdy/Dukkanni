@@ -43,6 +43,17 @@ export type CategoryUpdateValues = z.infer<typeof categoryUpdateSchema>;
 // Product
 // ---------------------------------------------------------------------------
 
+export const productOptionValueSchema = z.object({
+  value: z.string().trim().min(1, "القيمة مطلوبة"),
+  price: z.number().min(0, "السعر لا يقل عن 0").nullable().optional(),
+});
+
+export const productOptionSchema = z.object({
+  name: z.string().trim().min(1, "اسم الخيار مطلوب"),
+  hasCustomPrice: z.boolean().default(false),
+  values: z.array(productOptionValueSchema).min(1, "يجب إضافة قيمة واحدة على الأقل"),
+});
+
 export const productSchema = z.object({
   name: z
     .string()
@@ -74,6 +85,8 @@ export const productSchema = z.object({
 
   // image_url is handled separately via the upload endpoint
   image_url: z.string().url("رابط الصورة غير صالح").nullable().optional().default(null),
+
+  options: z.array(productOptionSchema).nullable().optional().default([]),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema>;

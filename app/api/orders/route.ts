@@ -63,6 +63,15 @@ const orderSchema = z.object({
       z.object({
         productId: z.string().uuid("معرف المنتج غير صالح"),
         quantity:  z.number().int().min(1).max(999),
+        selectedOptions: z
+          .array(
+            z.object({
+              name: z.string(),
+              value: z.string(),
+              price: z.number().nullable().optional(),
+            })
+          )
+          .optional(),
       })
     )
     .min(1, "السلة فارغة")
@@ -164,7 +173,7 @@ export async function POST(request: NextRequest) {
 
   const { data: products, error: productsError } = await supabase
     .from("products")
-    .select("id, name, price, is_active")
+    .select("id, name, price, options, is_active")
     .in("id", productIds)
     .eq("store_id", store.id)  // Critical: ensure products belong to THIS store
     .eq("is_active", true);
@@ -175,8 +184,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Verify every requested product exists and belongs to the store
-  const productMap = new Map<string, { id: string; name: string; price: number; is_active: boolean }>(
-    (products ?? []).map((p: { id: string; name: string; price: number; is_active: boolean }) => [p.id, p])
+  const productMap = new Map<string, { id: string; name: string; price: number; options: any; is_active: boolean }>(
+    (products ?? []).map((p: any) => [p.id, p])
   );
   const missingProducts = productIds.filter((id) => !productMap.has(id));
 
@@ -189,11 +198,32 @@ export async function POST(request: NextRequest) {
 
   // ── Build order line items with DB prices ─────────────────────────────────
   const lineItems = items.map((item) => {
-    const product = productMap.get(item.productId) as { id: string; name: string; price: number; is_active: boolean };
+    const product = productMap.get(item.productId) as { id: string; name: string; price: number; options: any; is_active: boolean };
+    
+    // Parse cumulative options pricing modifiers
+    let resolvedPrice = product.price;
+    const details: string[] = [];
+    const productOptions = (product.options as any[]) ?? [];
+
+    if (item.selectedOptions && item.selectedOptions.length > 0) {
+      item.selectedOptions.forEach((selOpt) => {
+        const matchOpt = productOptions.find((o) => o.name === selOpt.name);
+        if (matchOpt && matchOpt.hasCustomPrice) {
+          const matchVal = matchOpt.values?.find((v: any) => v.value === selOpt.value);
+          if (matchVal && matchVal.price != null) {
+            resolvedPrice += matchVal.price; // Add cumulative modifier
+          }
+        }
+        details.push(`${selOpt.name}: ${selOpt.value}`);
+      });
+    }
+
+    const formattedName = product.name + (details.length > 0 ? ` (${details.join(", ")})` : "");
+
     return {
       product_id:   item.productId,
-      product_name: product.name,
-      unit_price:   product.price,
+      product_name: formattedName,
+      unit_price:   resolvedPrice,
       quantity:     item.quantity,
     };
   });

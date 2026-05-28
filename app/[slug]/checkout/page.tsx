@@ -110,6 +110,10 @@ export default function CheckoutPage({
     tr: {},
     en: {}
   });
+  const [translatedOptions, setTranslatedOptions] = useState<Record<"tr" | "en", Record<string, string>>>({
+    tr: {},
+    en: {}
+  });
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
 
   useEffect(() => {
@@ -143,12 +147,26 @@ export default function CheckoutPage({
     const performTranslation = async () => {
       try {
         const itemNames = cart.items.map((i) => i.name);
-        if (itemNames.length === 0) return;
+        
+        // Extract all selected option names and values to translate
+        const optionTexts: string[] = [];
+        cart.items.forEach((item) => {
+          const opts = item.selectedOptions ?? [];
+          opts.forEach((opt) => {
+            if (opt.name) optionTexts.push(opt.name);
+            if (opt.value) optionTexts.push(opt.value);
+          });
+        });
+        
+        const uniqueOptionTexts = Array.from(new Set(optionTexts));
+        const allText = [...itemNames, ...uniqueOptionTexts];
+
+        if (allText.length === 0) return;
 
         const response = await fetch("/api/translate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: itemNames, target: lang }),
+          body: JSON.stringify({ text: allText, target: lang }),
         });
 
         if (!response.ok) throw new Error("Translation failed");
@@ -157,11 +175,21 @@ export default function CheckoutPage({
         const translatedArray: string[] = json.translations;
 
         const itemTranslations: Record<string, string> = {};
-        cart.items.forEach((item, index) => {
+        const optTranslations: Record<string, string> = {};
+
+        let index = 0;
+        cart.items.forEach((item) => {
           itemTranslations[item.productId] = translatedArray[index] || item.name;
+          index++;
+        });
+
+        uniqueOptionTexts.forEach((text) => {
+          optTranslations[text] = translatedArray[index] || text;
+          index++;
         });
 
         setTranslatedItemNames((prev) => ({ ...prev, [lang]: itemTranslations }));
+        setTranslatedOptions((prev) => ({ ...prev, [lang]: optTranslations }));
         setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
       } catch (err) {
         console.error("Cart items translation failed:", err);
@@ -262,6 +290,7 @@ export default function CheckoutPage({
           items:        cart.items.map((i) => ({
             productId: i.productId,
             quantity:  i.quantity,
+            selectedOptions: i.selectedOptions,
           })),
         }),
       });
@@ -276,14 +305,29 @@ export default function CheckoutPage({
       const order: OrderResult = json.data;
 
       // ── Step 2: Build WhatsApp message with length guard ────────────────
-      // Map product names to their translated versions for the WhatsApp payload!
-      const translatedItemsForWA = order.items.map((i) => {
-        // Find the matching cart item to extract its product ID for translated name lookup
-        const cartItem = cart.items.find((ci) => ci.name === i.name);
-        const translatedName = lang === "ar" ? i.name : (cartItem ? (translatedItemNames[lang]?.[cartItem.productId] || i.name) : i.name);
+      // Map product names & options to their translated versions for the WhatsApp payload!
+      const translatedItemsForWA = order.items.map((orderItem, idx) => {
+        const cartItem = cart.items[idx];
+        if (!cartItem) return orderItem;
+
+        // Base name
+        const baseName = lang === "ar" ? cartItem.name : (translatedItemNames[lang]?.[cartItem.productId] || cartItem.name);
+        
+        // Localized options details
+        const optionDetails: string[] = [];
+        if (cartItem.selectedOptions && cartItem.selectedOptions.length > 0) {
+          cartItem.selectedOptions.forEach((opt) => {
+            const optName = lang === "ar" ? opt.name : (translatedOptions[lang]?.[opt.name] ?? opt.name);
+            const optVal = lang === "ar" ? opt.value : (translatedOptions[lang]?.[opt.value] ?? opt.value);
+            optionDetails.push(`${optName}: ${optVal}`);
+          });
+        }
+        
+        const finalCombinedName = baseName + (optionDetails.length > 0 ? ` (${optionDetails.join(", ")})` : "");
+
         return {
-          ...i,
-          name: translatedName,
+          ...orderItem,
+          name: finalCombinedName,
         };
       });
 
@@ -606,7 +650,33 @@ export default function CheckoutPage({
                         >
                           {lang === "ar" ? item.name : (translatedItemNames[lang]?.[item.productId] ?? item.name)}
                         </p>
-                        <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "1px" }}>
+                        
+                        {/* Localized selected options tags */}
+                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "2px" }}>
+                            {item.selectedOptions.map((opt, oIdx) => {
+                              const translatedOptName = lang === "ar" ? opt.name : (translatedOptions[lang]?.[opt.name] ?? opt.name);
+                              const translatedValText = lang === "ar" ? opt.value : (translatedOptions[lang]?.[opt.value] ?? opt.value);
+                              return (
+                                <span
+                                  key={oIdx}
+                                  style={{
+                                    fontSize: "0.6875rem",
+                                    color: "var(--color-text-muted)",
+                                    background: "var(--color-surface-3)",
+                                    padding: "1px 5px",
+                                    borderRadius: "4px",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {translatedOptName}: {translatedValText}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "3px" }}>
                           {item.price.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US")} {currencySymbol} × {item.quantity}
                         </p>
                       </div>

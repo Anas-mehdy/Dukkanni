@@ -57,6 +57,9 @@ export interface LocaleDictionary {
   waMessageTotal: string;
   waMessageCustomer: string;
   waMessageTruncated: string;
+  selectOptionPrompt: string;
+  optionsModalHeading: string;
+  optionsConfirmBtn: string;
 }
 
 export const locales: Record<"ar" | "tr" | "en", LocaleDictionary> = {
@@ -111,6 +114,9 @@ export const locales: Record<"ar" | "tr" | "en", LocaleDictionary> = {
     waMessageTotal: "الإجمالي: {total} {symbol}",
     waMessageCustomer: "اسم الزبون: {customerName}",
     waMessageTruncated: "⚠️ +منتجات أخرى (الطلب طويل جداً للاختصار في واتساب)",
+    selectOptionPrompt: "اختر {optionName}",
+    optionsModalHeading: "تخصيص خيارات طلبك 💎",
+    optionsConfirmBtn: "إضافة للسلة بـ {price} {symbol} ←",
   },
   tr: {
     dir: "ltr",
@@ -163,6 +169,9 @@ export const locales: Record<"ar" | "tr" | "en", LocaleDictionary> = {
     waMessageTotal: "Toplam: {total} {symbol}",
     waMessageCustomer: "Müşteri Adı: {customerName}",
     waMessageTruncated: "⚠️ +daha fazla ürün (sipariş WhatsApp önizlemesi için çok uzun)",
+    selectOptionPrompt: "{optionName} Seçin",
+    optionsModalHeading: "Sipariş Seçeneklerini Belirleyin 💎",
+    optionsConfirmBtn: "Sepete Ekle - {price} {symbol} ←",
   },
   en: {
     dir: "ltr",
@@ -215,5 +224,8 @@ export const locales: Record<"ar" | "tr" | "en", LocaleDictionary> = {
     waMessageTotal: "Total: {total} {symbol}",
     waMessageCustomer: "Customer Name: {customerName}",
     waMessageTruncated: "⚠️ +more items (order too long for WhatsApp preview)",
+    selectOptionPrompt: "Select {optionName}",
+    optionsModalHeading: "Select Product Options 💎",
+    optionsConfirmBtn: "Add to Cart - {price} {symbol} ←",
   },
 };

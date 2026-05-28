@@ -22,12 +22,19 @@ import { useCallback, useEffect, useState } from "react";
 // Types (exported so checkout page can type-check)
 // ---------------------------------------------------------------------------
 
+export interface SelectedOption {
+  name: string;
+  value: string;
+  price: number | null;
+}
+
 export interface CartItem {
   productId: string;
   name:      string;
   price:     number;
   imageUrl:  string | null;
   quantity:  number;
+  selectedOptions?: SelectedOption[];
 }
 
 interface PersistedCart {
@@ -61,6 +68,15 @@ function persistCart(cart: PersistedCart): void {
   }
 }
 
+function isSameOptions(a?: SelectedOption[], b?: SelectedOption[]): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  return a.every((optA) =>
+    b.some((optB) => optB.name === optA.name && optB.value === optA.value)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -89,15 +105,19 @@ export function useCart(storeSlug: string) {
 
   /**
    * Adds qty units of a product to the cart.
-   * If the product already exists, its quantity is incremented.
+   * If the product already exists with the same selected options, its quantity is incremented.
    */
   const addItem = useCallback(
     (product: Omit<CartItem, "quantity">, qty = 1) => {
       setItems((prev) => {
-        const existing = prev.find((i) => i.productId === product.productId);
+        const existing = prev.find((i) =>
+          i.productId === product.productId &&
+          isSameOptions(i.selectedOptions, product.selectedOptions)
+        );
         if (existing) {
           return prev.map((i) =>
-            i.productId === product.productId
+            i.productId === product.productId &&
+            isSameOptions(i.selectedOptions, product.selectedOptions)
               ? { ...i, quantity: i.quantity + qty }
               : i
           );
@@ -109,23 +129,33 @@ export function useCart(storeSlug: string) {
   );
 
   /**
-   * Removes a product from the cart entirely.
+   * Removes a product variant from the cart entirely.
    */
-  const removeItem = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = useCallback((productId: string, selectedOptions?: SelectedOption[]) => {
+    setItems((prev) =>
+      prev.filter((i) =>
+        !(i.productId === productId && isSameOptions(i.selectedOptions, selectedOptions))
+      )
+    );
   }, []);
 
   /**
-   * Sets the exact quantity for a product.
+   * Sets the exact quantity for a product variant.
    * Passing qty ≤ 0 removes the product from the cart.
    */
-  const updateQuantity = useCallback((productId: string, qty: number) => {
+  const updateQuantity = useCallback((productId: string, qty: number, selectedOptions?: SelectedOption[]) => {
     if (qty <= 0) {
-      setItems((prev) => prev.filter((i) => i.productId !== productId));
+      setItems((prev) =>
+        prev.filter((i) =>
+          !(i.productId === productId && isSameOptions(i.selectedOptions, selectedOptions))
+        )
+      );
     } else {
       setItems((prev) =>
         prev.map((i) =>
-          i.productId === productId ? { ...i, quantity: qty } : i
+          i.productId === productId && isSameOptions(i.selectedOptions, selectedOptions)
+            ? { ...i, quantity: qty }
+            : i
         )
       );
     }
@@ -144,11 +174,22 @@ export function useCart(storeSlug: string) {
   // ── Computed values ───────────────────────────────────────────────────────
 
   /**
-   * Returns the current quantity in cart for a given productId (0 if absent).
+   * Returns the total quantity in cart for a given productId across all variants.
    */
   const getQuantity = useCallback(
     (productId: string): number =>
-      items.find((i) => i.productId === productId)?.quantity ?? 0,
+      items
+        .filter((i) => i.productId === productId)
+        .reduce((sum, i) => sum + i.quantity, 0),
+    [items]
+  );
+
+  /**
+   * Returns the exact quantity in cart for a specific variant combination.
+   */
+  const getVariantQuantity = useCallback(
+    (productId: string, selectedOptions?: SelectedOption[]): number =>
+      items.find((i) => i.productId === productId && isSameOptions(i.selectedOptions, selectedOptions))?.quantity ?? 0,
     [items]
   );
 
@@ -163,6 +204,7 @@ export function useCart(storeSlug: string) {
     updateQuantity,
     clearCart,
     getQuantity,
+    getVariantQuantity,
     totalItems,
     totalPrice,
   } as const;

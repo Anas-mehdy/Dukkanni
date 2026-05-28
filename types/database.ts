@@ -59,6 +59,7 @@ export interface ProductRow {
   image_url:   string | null;
   is_active:   boolean;
   sort_order:  number;
+  options:     Json;
   created_at:  string;
   updated_at:  string;
 }

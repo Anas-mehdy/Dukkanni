@@ -29,7 +29,7 @@ import { locales } from "@/lib/locales";
 interface StoreViewProps {
   store:      Pick<StoreRow, "id" | "name" | "slug" | "logo_url" | "currency_code">;
   categories: Pick<CategoryRow, "id" | "name" | "sort_order">[];
-  products:   Pick<ProductRow, "id" | "name" | "price" | "image_url" | "is_active" | "sort_order" | "category_id">[];
+  products:   Pick<ProductRow, "id" | "name" | "price" | "image_url" | "is_active" | "sort_order" | "category_id" | "options">[];
 }
 
 // ---------------------------------------------------------------------------
@@ -267,8 +267,32 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     tr: {},
     en: {}
   });
+  const [translatedOptions, setTranslatedOptions] = useState<Record<"tr" | "en", Record<string, string>>>({
+    tr: {},
+    en: {}
+  });
   const [translating, setTranslating] = useState(false);
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
+
+  // Modal states for product options selection
+  const [selectedProductForOptions, setSelectedProductForOptions] = useState<ProductRow | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({}); // option.name (Arabic) -> value (Arabic)
+
+  // Cumulative Price calculation helper
+  const getCumulativePrice = (product: any, selections: Record<string, string>) => {
+    let totalPrice = product.price;
+    const opts = (product.options as any[]) ?? [];
+    opts.forEach((opt) => {
+      const selectedVal = selections[opt.name];
+      if (selectedVal && opt.hasCustomPrice) {
+        const matchVal = opt.values?.find((v: any) => v.value === selectedVal);
+        if (matchVal && matchVal.price != null) {
+          totalPrice += matchVal.price;
+        }
+      }
+    });
+    return totalPrice;
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
@@ -287,7 +311,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     document.documentElement.lang = lang;
   }, [lang, mounted, t.dir]);
 
-  // Effect to automatically translate category & product names when language switches
+  // Effect to automatically translate category, product, and option names when language switches
   useEffect(() => {
     if (!mounted) return;
     if (lang === "ar") return; // Arabic is the source of truth
@@ -298,7 +322,23 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       try {
         const categoryNames = categories.map((c) => c.name);
         const productNames = products.map((p) => p.name);
-        const allText = [...categoryNames, ...productNames];
+        
+        // Extract all options names and values to translate
+        const optionTexts: string[] = [];
+        products.forEach((p) => {
+          const opts = (p.options as any[]) ?? [];
+          opts.forEach((opt) => {
+            if (opt.name) optionTexts.push(opt.name);
+            if (opt.values) {
+              opt.values.forEach((v: any) => {
+                if (v.value) optionTexts.push(v.value);
+              });
+            }
+          });
+        });
+        
+        const uniqueOptionTexts = Array.from(new Set(optionTexts));
+        const allText = [...categoryNames, ...productNames, ...uniqueOptionTexts];
 
         if (allText.length === 0) return;
 
@@ -315,6 +355,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
         const catTranslations: Record<string, string> = {};
         const prodTranslations: Record<string, string> = {};
+        const optTranslations: Record<string, string> = {};
 
         let index = 0;
         categories.forEach((c) => {
@@ -327,8 +368,14 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           index++;
         });
 
+        uniqueOptionTexts.forEach((text) => {
+          optTranslations[text] = translatedArray[index] || text;
+          index++;
+        });
+
         setTranslatedCategories((prev) => ({ ...prev, [lang]: catTranslations }));
         setTranslatedProducts((prev) => ({ ...prev, [lang]: prodTranslations }));
+        setTranslatedOptions((prev) => ({ ...prev, [lang]: optTranslations }));
         setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
       } catch (err) {
         console.error("Catalog translation failed:", err);
@@ -369,20 +416,81 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
   // Cart Handlers
   const handleAdd = (product: StoreViewProps["products"][number], translatedName?: string) => {
-    cart.addItem({
-      productId: product.id,
-      name:      translatedName ?? product.name,
-      price:     product.price,
-      imageUrl:  product.image_url,
-    });
+    const opts = (product.options as any[]) ?? [];
+    if (opts.length > 0) {
+      setSelectedProductForOptions(product as any);
+      
+      // Auto-select the first value of each option group
+      const initialSelections: Record<string, string> = {};
+      opts.forEach((opt) => {
+        if (opt.values && opt.values.length > 0) {
+          initialSelections[opt.name] = opt.values[0].value;
+        }
+      });
+      setSelectedOptions(initialSelections);
+    } else {
+      cart.addItem({
+        productId: product.id,
+        name:      translatedName ?? product.name,
+        price:     product.price,
+        imageUrl:  product.image_url,
+      });
+    }
   };
 
   const handleIncrement = (product: StoreViewProps["products"][number]) => {
-    cart.updateQuantity(product.id, cart.getQuantity(product.id) + 1);
+    const opts = (product.options as any[]) ?? [];
+    if (opts.length > 0) {
+      // Re-open selection modal to add another variant combination
+      handleAdd(product);
+    } else {
+      cart.updateQuantity(product.id, cart.getQuantity(product.id) + 1);
+    }
   };
 
   const handleDecrement = (product: StoreViewProps["products"][number]) => {
-    cart.updateQuantity(product.id, cart.getQuantity(product.id) - 1);
+    const opts = (product.options as any[]) ?? [];
+    if (opts.length > 0) {
+      // Find the last added cart item for this product and decrement it
+      const matchingItems = cart.items.filter((i) => i.productId === product.id);
+      if (matchingItems.length > 0) {
+        const lastItem = matchingItems[matchingItems.length - 1];
+        cart.updateQuantity(product.id, lastItem.quantity - 1, lastItem.selectedOptions);
+      }
+    } else {
+      cart.updateQuantity(product.id, cart.getQuantity(product.id) - 1);
+    }
+  };
+
+  const handleConfirmOptions = () => {
+    if (!selectedProductForOptions) return;
+    
+    const p = selectedProductForOptions;
+    const opts = (p.options as any[]) ?? [];
+    
+    // Prepare selectedOptions array for the CartItem (stores original Arabic keys/values)
+    const selectedOptionsArray = opts.map((opt) => {
+      const valName = selectedOptions[opt.name];
+      const matchVal = opt.values?.find((v: any) => v.value === valName);
+      return {
+        name: opt.name,
+        value: valName,
+        price: opt.hasCustomPrice && matchVal ? matchVal.price : null,
+      };
+    });
+
+    const finalPrice = getCumulativePrice(p, selectedOptions);
+    const translatedName = lang === "ar" ? p.name : (translatedProducts[lang]?.[p.id] ?? p.name);
+
+    cart.addItem({
+      productId: p.id,
+      name:      translatedName,
+      price:     finalPrice,
+      imageUrl:  p.image_url,
+      selectedOptions: selectedOptionsArray,
+    });
+
+    setSelectedProductForOptions(null);
   };
 
   // Store first letter (like the "ج" circular avatar)
@@ -902,6 +1010,197 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           `}</style>
         </div>
       )}
+
+      {/* ──────────────────────────────────────────────────────────────────── */}
+      {/* Dynamic Product Options Bottom Sheet / Modal                         */}
+      {/* ──────────────────────────────────────────────────────────────────── */}
+      {selectedProductForOptions && (() => {
+        const p = selectedProductForOptions;
+        const opts = (p.options as any[]) ?? [];
+        const cumulativePrice = getCumulativePrice(p, selectedOptions);
+        const translatedProductName = lang === "ar" ? p.name : (translatedProducts[lang]?.[p.id] ?? p.name);
+
+        return (
+          <div
+            id="options-bottom-sheet-backdrop"
+            onClick={() => setSelectedProductForOptions(null)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.45)",
+              backdropFilter: "blur(4px)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              animation: "fade-in 0.2s ease-out",
+            }}
+          >
+            <div
+              id="options-bottom-sheet"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: "600px",
+                background: "var(--color-surface)",
+                borderTopLeftRadius: "var(--radius-xl)",
+                borderTopRightRadius: "var(--radius-xl)",
+                border: "1px solid var(--color-border)",
+                borderBottom: "none",
+                padding: "1.25rem 1rem",
+                boxShadow: "0 -8px 32px rgba(0,0,0,0.15)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.25rem",
+                animation: "sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                maxHeight: "85vh",
+                overflowY: "auto",
+                direction: t.dir,
+              }}
+            >
+              {/* Sheet Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 850, color: "var(--color-text)", lineHeight: 1.3 }}>
+                    {t.optionsModalHeading}
+                  </h3>
+                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-primary)", marginTop: "3px" }}>
+                    {translatedProductName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedProductForOptions(null)}
+                  className="btn-icon"
+                  style={{
+                    background: "var(--color-surface-2)",
+                    borderRadius: "50%",
+                    width: "30px",
+                    height: "30px",
+                    border: "none",
+                    color: "var(--color-text-muted)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontSize: "0.875rem"
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="divider" style={{ margin: 0 }} />
+
+              {/* Render Option Groups */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {opts.map((opt, optIdx) => {
+                  const translatedOptName = lang === "ar" ? opt.name : (translatedOptions[lang]?.[opt.name] ?? opt.name);
+                  const selectedVal = selectedOptions[opt.name];
+
+                  return (
+                    <div key={optIdx} style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+                      <label style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--color-text-muted)" }}>
+                        {t.selectOptionPrompt.replace("{optionName}", translatedOptName)}
+                      </label>
+                      
+                      {/* Values Chips Container */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                        {opt.values?.map((val: any, valIdx: number) => {
+                          const translatedValText = lang === "ar" ? val.value : (translatedOptions[lang]?.[val.value] ?? val.value);
+                          const isSelected = selectedVal === val.value;
+                          const hasPriceMod = opt.hasCustomPrice && val.price != null && val.price > 0;
+                          
+                          return (
+                            <button
+                              key={valIdx}
+                              onClick={() => {
+                                setSelectedOptions((prev) => ({
+                                  ...prev,
+                                  [opt.name]: val.value,
+                                }));
+                              }}
+                              style={{
+                                padding: "0.5rem 1rem",
+                                borderRadius: "var(--radius-md)",
+                                border: isSelected 
+                                  ? "2px solid var(--color-success)" 
+                                  : "1.5px solid var(--color-border)",
+                                background: isSelected 
+                                  ? "var(--color-success-muted)" 
+                                  : "var(--color-surface-2)",
+                                color: isSelected 
+                                  ? "var(--color-success)" 
+                                  : "var(--color-text)",
+                                fontSize: "0.8125rem",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                outline: "none",
+                              }}
+                            >
+                              <span>{translatedValText}</span>
+                              {hasPriceMod && (
+                                <span style={{ 
+                                  fontSize: "0.75rem", 
+                                  opacity: 0.8, 
+                                  fontWeight: 600,
+                                  background: isSelected ? "rgba(37,211,102,0.15)" : "var(--color-surface-3)",
+                                  padding: "1px 5px",
+                                  borderRadius: "4px"
+                                }}>
+                                  +{val.price} {currencySymbol}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="divider" style={{ margin: "0.5rem 0 0 0" }} />
+
+              {/* Confirm Button Action Bar */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+                <button
+                  onClick={handleConfirmOptions}
+                  className="btn-primary"
+                  style={{
+                    width: "100%",
+                    fontSize: "0.9375rem",
+                    minHeight: "48px",
+                    background: "linear-gradient(135deg, var(--color-success), #16a34a)",
+                    border: "none",
+                    boxShadow: "0 4px 12px var(--color-success-muted)",
+                    fontWeight: 850,
+                  }}
+                >
+                  {t.optionsConfirmBtn
+                    .replace("{price}", cumulativePrice.toLocaleString(lang === "ar" ? "ar-EG" : lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 }))
+                    .replace("{symbol}", currencySymbol)}
+                </button>
+              </div>
+            </div>
+
+            <style>{`
+              @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes sheet-slide-up {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+              }
+            `}</style>
+          </div>
+        );
+      })()}
     </div>
   );
 }

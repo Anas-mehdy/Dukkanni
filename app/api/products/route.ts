@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("products")
     .select(`
-      id, name, price, image_url, is_active, sort_order, category_id, created_at, updated_at,
+      id, name, price, image_url, is_active, sort_order, category_id, options, created_at, updated_at,
       categories ( id, name )
     `)
     .eq("store_id", store.id)
@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
       is_active:   parsed.data.is_active ?? true,
       sort_order:  parsed.data.sort_order ?? 0,
       image_url:   parsed.data.image_url ?? null,
+      options:     parsed.data.options ?? [],
     })
-    .select("id, name, price, image_url, is_active, sort_order, category_id, created_at")
+    .select("id, name, price, image_url, is_active, sort_order, category_id, options, created_at")
     .single();
 
   if (error) {
@@ -184,7 +185,7 @@ export async function PUT(request: NextRequest) {
     .update(updatePayload)
     .eq("id", id)
     .eq("store_id", store.id) // app-layer tenant isolation (RLS also enforces this)
-    .select("id, name, price, image_url, is_active, sort_order, category_id, updated_at")
+    .select("id, name, price, image_url, is_active, sort_order, category_id, options, updated_at")
     .single();
 
   if (error) {
