@@ -22,6 +22,7 @@ export const CURRENCY_LABELS: Record<string, { symbol: string; name: string; nam
   MAD: { symbol: "د.م", name: "Moroccan Dirham",     nameAr: "درهم مغربي" },
   USD: { symbol: "$",    name: "US Dollar",           nameAr: "دولار أمريكي" },
   EUR: { symbol: "€",    name: "Euro",                nameAr: "يورو" },
+  SYP: { symbol: "ل.س",  name: "Syrian Pound",        nameAr: "ليرة سورية" },
 };
 
 export function getCurrencySymbol(code: string): string {

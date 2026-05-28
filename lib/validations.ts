@@ -107,7 +107,7 @@ export const storeSettingsSchema = z.object({
     .max(20, "رقم الهاتف طويل جداً"),
 
   currency_code: z
-    .enum(["TRY", "SAR", "AED", "EGP", "IQD", "KWD", "QAR", "OMR", "JOD", "MAD", "USD", "EUR"])
+    .enum(["TRY", "SAR", "AED", "EGP", "IQD", "KWD", "QAR", "OMR", "JOD", "MAD", "USD", "EUR", "SYP"])
     .default("TRY"),
 
   logo_url: z.string().url("رابط الشعار غير صالح").nullable().optional().default(null),

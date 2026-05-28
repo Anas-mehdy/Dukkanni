@@ -63,7 +63,7 @@ const patchSchema = z.object({
     .default("TR"),
 
   currency_code: z
-    .enum(["TRY", "SAR", "AED", "EGP", "IQD", "USD", "EUR", "KWD", "QAR", "OMR", "JOD", "MAD"])
+    .enum(["TRY", "SAR", "AED", "EGP", "IQD", "USD", "EUR", "KWD", "QAR", "OMR", "JOD", "MAD", "SYP"])
     .optional(),
 
   logo_url: z.string().url("رابط الشعار غير صالح").nullable().optional(),
