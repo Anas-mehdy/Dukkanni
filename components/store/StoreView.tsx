@@ -358,6 +358,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({}); // option.name (Arabic) -> value (Arabic)
   const [localQty, setLocalQty] = useState(1);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   // Swipe gesture tracking state
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -1299,13 +1300,15 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                   <img
                     src={productImages[activeImageIdx]}
                     alt={translatedProductName}
+                    onClick={() => setFullScreenImage(productImages[activeImageIdx])}
                     style={{
                       width: "100%",
                       height: "100%",
                       objectFit: "cover",
                       display: "block",
                       userSelect: "none",
-                      pointerEvents: "none",
+                      pointerEvents: "auto",
+                      cursor: "zoom-in",
                     }}
                   />
                 ) : (
@@ -1707,6 +1710,81 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           </div>
         );
       })()}
+    {fullScreenImage && (
+        <div
+          id="image-lightbox-overlay"
+          onClick={() => setFullScreenImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0, 0, 0, 0.88)",
+            backdropFilter: "blur(15px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 99999,
+            animation: "fade-in 0.2s ease-out",
+            cursor: "zoom-out",
+          }}
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => setFullScreenImage(null)}
+            style={{
+              position: "absolute",
+              top: "1.5rem",
+              right: "1.5rem",
+              background: "rgba(255, 255, 255, 0.12)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+              color: "#ffffff",
+              borderRadius: "50%",
+              width: "44px",
+              height: "44px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.25rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+              outline: "none",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
+              e.currentTarget.style.transform = "scale(1.08)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+            aria-label="إغلاق"
+          >
+            ✕
+          </button>
+
+          {/* Image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fullScreenImage}
+            alt="Full Preview"
+            style={{
+              maxWidth: "92%",
+              maxHeight: "88%",
+              objectFit: "contain",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)",
+              animation: "modal-scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself
+          />
+        </div>
+      )}
     </div>
   );
 }
