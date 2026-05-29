@@ -52,6 +52,46 @@ function LoginFormContent() {
   const [apiError,   setApiError]   = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Password recovery states
+  const [mode, setMode] = useState<"login" | "forgot">("login");
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setApiError("");
+    setErrors({});
+
+    if (!email.trim()) {
+      setErrors({ email: "البريد الإلكتروني مطلوب" });
+      return;
+    }
+    if (!email.trim().includes("@")) {
+      setErrors({ email: "البريد الإلكتروني غير صحيح" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        if (error.message.includes("Too many requests")) {
+          setApiError("لقد أرسلنا طلباً بالفعل مؤخراً. يرجى الانتظار قليلاً والمحاولة مجدداً.");
+        } else {
+          setApiError(error.message);
+        }
+      } else {
+        setForgotSuccess(true);
+      }
+    } catch {
+      setApiError("حدث خطأ أثناء إرسال الطلب. يرجى المحاولة لاحقاً.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError("");
@@ -99,6 +139,143 @@ function LoginFormContent() {
     router.push(destination);
     router.refresh(); // Ensure server components re-fetch with new session
   };
+
+  if (mode === "forgot") {
+    return (
+      <div
+        style={{
+          background:   "var(--color-surface)",
+          border:       "1px solid var(--color-border)",
+          borderRadius: "var(--radius-xl)",
+          padding:      "2rem 1.5rem",
+          boxShadow:    "var(--shadow-md), 0 0 40px var(--color-primary-glow)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
+          <h1 style={{ fontSize: "1.375rem", fontWeight: 800, marginBottom: "0.25rem" }}>
+            إعادة تعيين كلمة المرور 🔑
+          </h1>
+          <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)" }}>
+            أدخل بريدك الإلكتروني لإرسال رابط إعادة التعيين
+          </p>
+        </div>
+
+        {/* API Error banner */}
+        {apiError && (
+          <div
+            role="alert"
+            style={{
+              display:      "flex",
+              alignItems:   "flex-start",
+              gap:          "0.5rem",
+              background:   "var(--color-danger-muted)",
+              border:       "1.5px solid var(--color-danger)",
+              borderRadius: "var(--radius-md)",
+              padding:      "0.75rem 1rem",
+              fontSize:     "0.875rem",
+              color:        "var(--color-danger)",
+              fontWeight:   600,
+              marginBottom: "1.25rem",
+              lineHeight:   1.4,
+            }}
+          >
+            <span style={{ fontSize: "1rem", flexShrink: 0 }}>⚠</span>
+            <span>{apiError}</span>
+          </div>
+        )}
+
+        {/* Success message */}
+        {forgotSuccess ? (
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem 0" }}>
+            <div
+              style={{
+                width: "60px",
+                height: "60px",
+                borderRadius: "50%",
+                background: "var(--color-success-muted)",
+                border: "2px solid var(--color-success)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.75rem",
+                margin: "0 auto 0.5rem",
+              }}
+            >
+              ✓
+            </div>
+            <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--color-text)" }}>
+              تم إرسال رابط إعادة التعيين
+            </p>
+            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+              لقد أرسلنا رابطاً خاصاً لإعادة تعيين كلمة المرور إلى البريد <strong style={{ color: "var(--color-text)" }}>{email}</strong>. يرجى مراجعة بريدك الإلكتروني (وصندوق الرسائل غير المرغوب فيها).
+            </p>
+            
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ width: "100%", marginTop: "1rem" }}
+              onClick={() => { setMode("login"); setForgotSuccess(false); setEmail(""); }}
+            >
+              العودة لتسجيل الدخول
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleForgotSubmit} noValidate>
+            {/* Email Input */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                htmlFor="forgot-email"
+                style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: "0.375rem" }}
+              >
+                البريد الإلكتروني المسجل
+              </label>
+              <input
+                id="forgot-email"
+                type="email"
+                className={`input-base${errors.email ? " input-error" : ""}`}
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: undefined })); setApiError(""); }}
+                placeholder="you@example.com"
+                disabled={submitting}
+                dir="ltr"
+                inputMode="email"
+              />
+              {errors.email && <p style={errorStyle}>{errors.email}</p>}
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary"
+              style={{ width: "100%", fontSize: "1rem", fontWeight: 800, marginBottom: "0.75rem" }}
+            >
+              {submitting ? (
+                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <SpinnerIcon />
+                  جاري إرسال الرابط...
+                </span>
+              ) : (
+                "إرسال رابط إعادة التعيين ←"
+              )}
+            </button>
+
+            {/* Cancel / Back to login */}
+            <button
+              type="button"
+              disabled={submitting}
+              className="btn-ghost"
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+              onClick={() => { setMode("login"); setErrors({}); setApiError(""); }}
+            >
+              العودة لتسجيل الدخول
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -182,7 +359,7 @@ function LoginFormContent() {
             <button
               type="button"
               style={{ fontSize: "0.75rem", color: "var(--color-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-cairo), sans-serif" }}
-              onClick={() => {/* TODO: forgot password flow */}}
+              onClick={() => { setMode("forgot"); setErrors({}); setApiError(""); }}
               tabIndex={-1}
             >
               نسيت كلمة المرور؟
