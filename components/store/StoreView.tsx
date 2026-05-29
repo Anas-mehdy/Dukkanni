@@ -14,7 +14,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useCart } from "@/hooks/useCart";
 import { getCurrencySymbol } from "@/lib/constants";
@@ -59,6 +59,7 @@ function ProductCard({
   onAdd,
   onIncrement,
   onDecrement,
+  onCardClick,
   t,
   lang,
 }: {
@@ -68,6 +69,7 @@ function ProductCard({
   onAdd:         () => void;
   onIncrement:   () => void;
   onDecrement:   () => void;
+  onCardClick:   () => void;
   t:             any;
   lang:          string;
 }) {
@@ -75,6 +77,7 @@ function ProductCard({
     <div
       id={`product-${product.id}`}
       className="card"
+      onClick={onCardClick}
       style={{
         display:        "flex",
         flexDirection:  "column",
@@ -84,7 +87,8 @@ function ProductCard({
         borderColor:    "var(--color-border)",
         borderRadius:   "var(--radius-lg)",
         boxShadow:      "var(--shadow-sm)",
-        transition:     "all 0.25s ease"
+        transition:     "all 0.25s ease",
+        cursor:         "pointer",
       }}
     >
       {/* Absolute Green Indicator Dot */}
@@ -351,6 +355,35 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   // Modal states for product options selection
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<ProductRow | null>(null);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({}); // option.name (Arabic) -> value (Arabic)
+  const [localQty, setLocalQty] = useState(1);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
+
+  // Swipe gesture tracking state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (imagesLength: number) => {
+    if (!touchStart || !touchEnd || imagesLength <= 1) return;
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 50;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+      setActiveImageIdx((prev) => (prev < imagesLength - 1 ? prev + 1 : prev));
+    } else if (isRightSwipe) {
+      setActiveImageIdx((prev) => (prev > 0 ? prev - 1 : prev));
+    }
+  };
 
   // Cumulative Price calculation helper
   const getCumulativePrice = (product: any, selections: Record<string, string>) => {
@@ -518,20 +551,27 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     return products.filter((p) => !p.category_id);
   }, [activeCategory, products]);
 
-  // Cart Handlers
+  // Cart Handlers & Modal Quick View Open
+  const handleCardClick = (product: StoreViewProps["products"][number]) => {
+    setSelectedProductForOptions(product as any);
+    setLocalQty(1);
+    setActiveImageIdx(0);
+    
+    // Auto-select the first value of each option group if present
+    const opts = (product.options as any[]) ?? [];
+    const initialSelections: Record<string, string> = {};
+    opts.forEach((opt) => {
+      if (opt.values && opt.values.length > 0) {
+        initialSelections[opt.name] = opt.values[0].value;
+      }
+    });
+    setSelectedOptions(initialSelections);
+  };
+
   const handleAdd = (product: StoreViewProps["products"][number], translatedName?: string) => {
     const opts = (product.options as any[]) ?? [];
     if (opts.length > 0) {
-      setSelectedProductForOptions(product as any);
-      
-      // Auto-select the first value of each option group
-      const initialSelections: Record<string, string> = {};
-      opts.forEach((opt) => {
-        if (opt.values && opt.values.length > 0) {
-          initialSelections[opt.name] = opt.values[0].value;
-        }
-      });
-      setSelectedOptions(initialSelections);
+      handleCardClick(product);
     } else {
       cart.addItem({
         productId: product.id,
@@ -546,7 +586,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     const opts = (product.options as any[]) ?? [];
     if (opts.length > 0) {
       // Re-open selection modal to add another variant combination
-      handleAdd(product);
+      handleCardClick(product);
     } else {
       cart.updateQuantity(product.id, cart.getQuantity(product.id) + 1);
     }
@@ -591,8 +631,8 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       name:      translatedName,
       price:     finalPrice,
       imageUrl:  p.image_url,
-      selectedOptions: selectedOptionsArray,
-    });
+      selectedOptions: opts.length > 0 ? selectedOptionsArray : undefined,
+    }, localQty);
 
     setSelectedProductForOptions(null);
   };
@@ -1047,6 +1087,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                           onAdd={() => handleAdd(product, translatedName)}
                           onIncrement={() => handleIncrement(product)}
                           onDecrement={() => handleDecrement(product)}
+                          onCardClick={() => handleCardClick(product)}
                           t={t}
                           lang={lang}
                         />
@@ -1089,6 +1130,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                         onAdd={() => handleAdd(product, translatedName)}
                         onIncrement={() => handleIncrement(product)}
                         onDecrement={() => handleDecrement(product)}
+                        onCardClick={() => handleCardClick(product)}
                         t={t}
                         lang={lang}
                       />
@@ -1162,13 +1204,46 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       )}
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* Dynamic Product Options Bottom Sheet / Modal                         */}
+      {/* Premium Quick View & Purchase Sheet / Modal */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       {selectedProductForOptions && (() => {
         const p = selectedProductForOptions;
         const opts = (p.options as any[]) ?? [];
         const cumulativePrice = getCumulativePrice(p, selectedOptions);
         const translatedProductName = lang === "ar" ? p.name : (translatedProducts[lang]?.[p.id] ?? p.name);
+
+        // Fallback multi-images for Dukkanni's default demo items to show off the carousel
+        const demoImages: Record<string, string[]> = {
+          "عطر الياسمين الشامي": [
+            "/products-images-mainpage/jasmine.jpeg",
+            "/products-images-mainpage/lavender.jpeg",
+            "/products-images-mainpage/rose.jpeg",
+          ],
+          "عطر اللافندر الطبيعي": [
+            "/products-images-mainpage/lavender.jpeg",
+            "/products-images-mainpage/jasmine.jpeg",
+            "/products-images-mainpage/white_musk.jpeg",
+          ],
+          "دهن العود الملكي": [
+            "/products-images-mainpage/royal_oud.jpeg",
+            "/products-images-mainpage/premium_incense.jpeg",
+            "/products-images-mainpage/jasmine.jpeg",
+          ]
+        };
+
+        const rawOptions = p.options as any;
+        const productImages: string[] = (p as any).images 
+          || (Array.isArray(rawOptions?.images) ? rawOptions.images : null)
+          || demoImages[p.name]
+          || (p.image_url ? [p.image_url] : []);
+
+        const productDescription: string = (p as any).description 
+          || (typeof rawOptions?.description === "string" ? rawOptions.description : null)
+          || (lang === "ar" 
+              ? "منتج مميز ومصنوع بجودة عالية لضمان أفضل تجربة استخدام. مثالي للاستخدام اليومي ومطابق تماماً للمواصفات المعتمدة والضوابط الفنية المتبعة لراحة عائلتك وجمال منزلك." 
+              : lang === "tr" 
+              ? "En iyi kullanıcı deneyimini sağlamak için yüksek kalitede üretilmiş premium ürün. Günlük kullanım için ideal ve onaylanmış spesifikasyonlarla tam uyumlu." 
+              : "Premium product crafted with high quality to ensure the best user experience. Perfect for daily use and fully compliant with approved specifications.");
 
         return (
           <div
@@ -1183,9 +1258,6 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               background: "rgba(0, 0, 0, 0.45)",
               backdropFilter: "blur(4px)",
               zIndex: 1000,
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
               animation: "fade-in 0.2s ease-out",
             }}
           >
@@ -1193,152 +1265,432 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               id="options-bottom-sheet"
               onClick={(e) => e.stopPropagation()}
               style={{
-                width: "100%",
-                maxWidth: "600px",
                 background: "var(--color-surface)",
-                borderTopLeftRadius: "var(--radius-xl)",
-                borderTopRightRadius: "var(--radius-xl)",
                 border: "1px solid var(--color-border)",
-                borderBottom: "none",
-                padding: "1.25rem 1rem",
+                padding: "1.25rem 1.25rem 1rem 1.25rem",
                 boxShadow: "0 -8px 32px rgba(0,0,0,0.15)",
                 display: "flex",
                 flexDirection: "column",
-                gap: "1.25rem",
-                animation: "sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-                maxHeight: "85vh",
+                gap: "1.1rem",
                 overflowY: "auto",
                 direction: t.dir,
               }}
             >
-              {/* Sheet Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <h3 style={{ fontSize: "1.1rem", fontWeight: 850, color: "var(--color-text)", lineHeight: 1.3 }}>
-                    {t.optionsModalHeading}
-                  </h3>
-                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-primary)", marginTop: "3px" }}>
-                    {translatedProductName}
-                  </p>
-                </div>
+              {/* 1. Multi-Image Carousel / Gallery */}
+              <div 
+                style={{
+                  width: "100%",
+                  position: "relative",
+                  background: "var(--color-surface-2)",
+                  borderRadius: "var(--radius-lg)",
+                  overflow: "hidden",
+                  aspectRatio: "16/10",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid var(--color-border-light)",
+                  touchAction: "pan-y",
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={() => handleTouchEnd(productImages.length)}
+              >
+                {productImages.length > 0 ? (
+                  <img
+                    src={productImages[activeImageIdx]}
+                    alt={translatedProductName}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                      userSelect: "none",
+                      pointerEvents: "none",
+                    }}
+                  />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                    <span style={{ fontSize: "2.5rem", opacity: 0.25 }}>📦</span>
+                    <span style={{ fontSize: "0.8125rem", color: "var(--color-text-faint)", fontWeight: 700 }}>
+                      {t.noImage}
+                    </span>
+                  </div>
+                )}
+
+                {/* Close Button overlay */}
                 <button
                   onClick={() => setSelectedProductForOptions(null)}
-                  className="btn-icon"
                   style={{
-                    background: "var(--color-surface-2)",
+                    position: "absolute",
+                    top: "12px",
+                    right: t.dir === "rtl" ? "auto" : "12px",
+                    left: t.dir === "rtl" ? "12px" : "auto",
+                    background: "rgba(0, 0, 0, 0.5)",
+                    backdropFilter: "blur(4px)",
                     borderRadius: "50%",
-                    width: "30px",
-                    height: "30px",
+                    width: "32px",
+                    height: "32px",
                     border: "none",
-                    color: "var(--color-text-muted)",
-                    fontWeight: 700,
+                    color: "#ffffff",
+                    fontWeight: 800,
                     cursor: "pointer",
-                    fontSize: "0.875rem"
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.875rem",
+                    zIndex: 10,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    transition: "background 0.2s",
                   }}
                 >
                   ✕
                 </button>
+
+                {/* Navigation Chevrons */}
+                {productImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setActiveImageIdx((prev) => (prev > 0 ? prev - 1 : prev))}
+                      disabled={activeImageIdx === 0}
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "12px",
+                        transform: "translateY(-50%)",
+                        background: "rgba(0, 0, 0, 0.4)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "32px",
+                        height: "32px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: activeImageIdx === 0 ? "default" : "pointer",
+                        opacity: activeImageIdx === 0 ? 0.2 : 1,
+                        transition: "all 0.2s",
+                        fontWeight: 800,
+                        fontSize: "1rem",
+                        zIndex: 5,
+                      }}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() => setActiveImageIdx((prev) => (prev < productImages.length - 1 ? prev + 1 : prev))}
+                      disabled={activeImageIdx === productImages.length - 1}
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        right: "12px",
+                        transform: "translateY(-50%)",
+                        background: "rgba(0, 0, 0, 0.4)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "32px",
+                        height: "32px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: activeImageIdx === productImages.length - 1 ? "default" : "pointer",
+                        opacity: activeImageIdx === productImages.length - 1 ? 0.2 : 1,
+                        transition: "all 0.2s",
+                        fontWeight: 800,
+                        fontSize: "1rem",
+                        zIndex: 5,
+                      }}
+                    >
+                      ›
+                    </button>
+                  </>
+                )}
+
+                {/* Dot indicators */}
+                {productImages.length > 1 && (
+                  <div style={{ position: "absolute", bottom: "12px", left: 0, right: 0, display: "flex", gap: "6px", justifyContent: "center", zIndex: 6 }}>
+                    {productImages.map((_, idx) => (
+                      <span
+                        key={idx}
+                        onClick={() => setActiveImageIdx(idx)}
+                        style={{
+                          width: idx === activeImageIdx ? "16px" : "6px",
+                          height: "6px",
+                          borderRadius: "3px",
+                          background: idx === activeImageIdx ? "var(--color-success)" : "rgba(255,255,255,0.4)",
+                          transition: "all 0.2s ease",
+                          cursor: "pointer",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="divider" style={{ margin: 0 }} />
+              {/* 2. Rich Product Title & Description Display */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", textAlign: t.dir === "rtl" ? "right" : "left", paddingInline: "0.25rem" }}>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 900, color: "var(--color-text)", lineHeight: 1.3 }}>
+                  {translatedProductName}
+                </h3>
+                <p style={{
+                  fontSize: "0.85rem",
+                  color: "var(--color-text-muted)",
+                  lineHeight: "1.6",
+                  whiteSpace: "pre-line",
+                  fontWeight: 600,
+                }}>
+                  {productDescription}
+                </p>
+              </div>
 
-              {/* Render Option Groups */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                {opts.map((opt, optIdx) => {
-                  const translatedOptName = lang === "ar" ? opt.name : (translatedOptions[lang]?.[opt.name] ?? opt.name);
-                  const selectedVal = selectedOptions[opt.name];
+              {/* Divider */}
+              <div className="divider" style={{ margin: "0.25rem 0" }} />
 
-                  return (
-                    <div key={optIdx} style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-                      <label style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--color-text-muted)" }}>
-                        {t.selectOptionPrompt.replace("{optionName}", translatedOptName)}
-                      </label>
-                      
-                      {/* Values Chips Container */}
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                        {opt.values?.map((val: any, valIdx: number) => {
-                          const translatedValText = lang === "ar" ? val.value : (translatedOptions[lang]?.[val.value] ?? val.value);
-                          const isSelected = selectedVal === val.value;
-                          const hasPriceMod = opt.hasCustomPrice && val.price != null && val.price > 0;
-                          
-                          return (
-                            <button
-                              key={valIdx}
-                              onClick={() => {
-                                setSelectedOptions((prev) => ({
-                                  ...prev,
-                                  [opt.name]: val.value,
-                                }));
-                              }}
-                              style={{
-                                padding: "0.5rem 1rem",
-                                borderRadius: "var(--radius-md)",
-                                border: isSelected 
-                                  ? "2px solid var(--color-success)" 
-                                  : "1.5px solid var(--color-border)",
-                                background: isSelected 
-                                  ? "var(--color-success-muted)" 
-                                  : "var(--color-surface-2)",
-                                color: isSelected 
-                                  ? "var(--color-success)" 
-                                  : "var(--color-text)",
-                                fontSize: "0.8125rem",
-                                fontWeight: 800,
-                                cursor: "pointer",
-                                transition: "all 0.15s ease",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                outline: "none",
-                              }}
-                            >
-                              <span>{translatedValText}</span>
-                              {hasPriceMod && (
-                                <span style={{ 
-                                  fontSize: "0.75rem", 
-                                  opacity: 0.8, 
-                                  fontWeight: 600,
-                                  background: isSelected ? "rgba(37,211,102,0.15)" : "var(--color-surface-3)",
-                                  padding: "1px 5px",
-                                  borderRadius: "4px"
-                                }}>
-                                  +{val.price} {currencySymbol}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+              {/* 3. Variant Options selectors */}
+              {opts.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem", textAlign: t.dir === "rtl" ? "right" : "left", paddingInline: "0.25rem" }}>
+                  {opts.map((opt, optIdx) => {
+                    const translatedOptName = lang === "ar" ? opt.name : (translatedOptions[lang]?.[opt.name] ?? opt.name);
+                    const selectedVal = selectedOptions[opt.name];
+
+                    return (
+                      <div key={optIdx} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        <label style={{ fontSize: "0.8125rem", fontWeight: 800, color: "var(--color-text-faint)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                          {t.selectOptionPrompt.replace("{optionName}", translatedOptName)}
+                        </label>
+                        
+                        {/* Values Chips Container */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                          {opt.values?.map((val: any, valIdx: number) => {
+                            const translatedValText = lang === "ar" ? val.value : (translatedOptions[lang]?.[val.value] ?? val.value);
+                            const isSelected = selectedVal === val.value;
+                            const hasPriceMod = opt.hasCustomPrice && val.price != null && val.price > 0;
+                            
+                            return (
+                              <button
+                                key={valIdx}
+                                onClick={() => {
+                                  setSelectedOptions((prev) => ({
+                                    ...prev,
+                                    [opt.name]: val.value,
+                                  }));
+                                }}
+                                style={{
+                                  padding: "0.45rem 0.9rem",
+                                  borderRadius: "var(--radius-md)",
+                                  border: isSelected 
+                                    ? "2px solid var(--color-success)" 
+                                    : "1.5px solid var(--color-border)",
+                                  background: isSelected 
+                                    ? "var(--color-success-muted)" 
+                                    : "var(--color-surface-2)",
+                                  color: isSelected 
+                                    ? "var(--color-success)" 
+                                    : "var(--color-text)",
+                                  fontSize: "0.8125rem",
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  outline: "none",
+                                }}
+                              >
+                                <span>{translatedValText}</span>
+                                {hasPriceMod && (
+                                  <span style={{ 
+                                    fontSize: "0.725rem", 
+                                    opacity: 0.8, 
+                                    fontWeight: 700,
+                                    background: isSelected ? "rgba(37,211,102,0.12)" : "var(--color-surface-3)",
+                                    padding: "1px 5px",
+                                    borderRadius: "4px"
+                                  }}>
+                                    +{val.price} {currencySymbol}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 4. Action Sticky Footer */}
+              <div 
+                style={{
+                  position: "sticky",
+                  bottom: "-1rem",
+                  left: 0,
+                  right: 0,
+                  background: "var(--color-surface)",
+                  borderTop: "1px solid var(--color-border)",
+                  padding: "0.875rem 0 0.5rem 0",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
+                  zIndex: 20,
+                  marginTop: "auto",
+                }}
+              >
+                {p.is_available !== false ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+                    {/* Quantity Stepper */}
+                    <div 
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "0.875rem", 
+                        background: "var(--color-surface-2)",
+                        border: "1.5px solid var(--color-border)",
+                        borderRadius: "var(--radius-full)",
+                        padding: "0.25rem",
+                      }}
+                    >
+                      <button
+                        onClick={() => { if (localQty > 1) setLocalQty((q) => q - 1); }}
+                        disabled={localQty <= 1}
+                        style={{
+                          width: "30px",
+                          height: "30px",
+                          borderRadius: "50%",
+                          background: localQty > 1 ? "var(--color-surface-3)" : "transparent",
+                          color: localQty > 1 ? "var(--color-text)" : "var(--color-text-faint)",
+                          border: "none",
+                          fontSize: "1rem",
+                          fontWeight: 800,
+                          cursor: localQty > 1 ? "pointer" : "default",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          outline: "none",
+                        }}
+                      >
+                        −
+                      </button>
+                      <span style={{ fontSize: "0.9375rem", fontWeight: 850, color: "var(--color-primary)", minWidth: "18px", textAlign: "center" }}>
+                        {localQty}
+                      </span>
+                      <button
+                        onClick={() => setLocalQty((q) => q + 1)}
+                        style={{
+                          width: "30px",
+                          height: "30px",
+                          borderRadius: "50%",
+                          background: "var(--color-success)",
+                          color: "#ffffff",
+                          border: "none",
+                          fontSize: "1rem",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: "0 2px 6px var(--color-success-muted)",
+                          outline: "none",
+                        }}
+                      >
+                        +
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
 
-              <div className="divider" style={{ margin: "0.5rem 0 0 0" }} />
-
-              {/* Confirm Button Action Bar */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-                <button
-                  onClick={handleConfirmOptions}
-                  className="btn-primary"
-                  style={{
-                    width: "100%",
-                    fontSize: "0.9375rem",
-                    minHeight: "48px",
-                    background: "linear-gradient(135deg, var(--color-success), #16a34a)",
-                    border: "none",
-                    boxShadow: "0 4px 12px var(--color-success-muted)",
-                    fontWeight: 850,
-                  }}
-                >
-                  {t.optionsConfirmBtn
-                    .replace("{price}", cumulativePrice.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 }))
-                    .replace("{symbol}", currencySymbol)}
-                </button>
+                    {/* Add to Cart Button */}
+                    <button
+                      onClick={handleConfirmOptions}
+                      className="btn-primary"
+                      style={{
+                        flex: 1,
+                        fontSize: "0.9375rem",
+                        minHeight: "46px",
+                        background: "linear-gradient(135deg, var(--color-success), #16a34a)",
+                        border: "none",
+                        boxShadow: "0 4px 12px var(--color-success-muted)",
+                        fontWeight: 850,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        outline: "none",
+                      }}
+                    >
+                      <span>
+                        {lang === "ar" 
+                          ? "إضافة إلى السلة" 
+                          : lang === "tr" 
+                          ? "Sepete Ekle" 
+                          : "Add to Cart"}
+                      </span>
+                      <span style={{ opacity: 0.8, fontWeight: 700 }}>•</span>
+                      <span>
+                        {(cumulativePrice * localQty).toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Out of Stock Button */
+                  <button
+                    disabled
+                    style={{
+                      width: "100%",
+                      minHeight: "46px",
+                      borderRadius: "var(--radius-xl)",
+                      background: "var(--color-surface-3)",
+                      color: "var(--color-text-faint)",
+                      border: "1.5px solid var(--color-border)",
+                      fontWeight: 850,
+                      fontSize: "0.9375rem",
+                      cursor: "not-allowed",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none",
+                    }}
+                  >
+                    {lang === "ar" 
+                      ? "غير متوفر حالياً 🚫" 
+                      : lang === "tr" 
+                      ? "Şu Anda Mevcut Değil 🚫" 
+                      : "Out of Stock 🚫"}
+                  </button>
+                )}
               </div>
             </div>
 
             <style>{`
+              #options-bottom-sheet-backdrop {
+                display: flex;
+                align-items: flex-end;
+                justify-content: center;
+              }
+              #options-bottom-sheet {
+                width: 100%;
+                max-height: 85vh;
+                border-top-left-radius: var(--radius-xl);
+                border-top-right-radius: var(--radius-xl);
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+                animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+              }
+
+              @media (min-width: 768px) {
+                #options-bottom-sheet-backdrop {
+                  align-items: center;
+                }
+                #options-bottom-sheet {
+                  width: 90%;
+                  max-width: 520px;
+                  border-radius: var(--radius-xl) !important;
+                  border: 1px solid var(--color-border) !important;
+                  animation: modal-scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                  max-height: 90vh;
+                }
+              }
+
               @keyframes fade-in {
                 from { opacity: 0; }
                 to { opacity: 1; }
@@ -1346,6 +1698,10 @@ export default function StoreView({ store, categories, products }: StoreViewProp
               @keyframes sheet-slide-up {
                 from { transform: translateY(100%); }
                 to { transform: translateY(0); }
+              }
+              @keyframes modal-scale-up {
+                from { transform: scale(0.95); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
               }
             `}</style>
           </div>
