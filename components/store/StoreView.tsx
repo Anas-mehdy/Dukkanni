@@ -341,6 +341,10 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     tr: {},
     en: {}
   });
+  const [translatedAnnouncements, setTranslatedAnnouncements] = useState<Record<"tr" | "en", string>>({
+    tr: "",
+    en: ""
+  });
   const [translating, setTranslating] = useState(false);
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
 
@@ -425,6 +429,13 @@ export default function StoreView({ store, categories, products }: StoreViewProp
         const uniqueOptionTexts = Array.from(new Set(optionTexts));
         const allText = [...categoryNames, ...productNames, ...uniqueOptionTexts];
 
+        // Add store.announcement_text to the end of the allText array for translation if it exists!
+        let announcementIndex = -1;
+        if (store.announcement_text) {
+          announcementIndex = allText.length;
+          allText.push(store.announcement_text);
+        }
+
         if (allText.length === 0) return;
 
         const response = await fetch("/api/translate", {
@@ -441,6 +452,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
         const catTranslations: Record<string, string> = {};
         const prodTranslations: Record<string, string> = {};
         const optTranslations: Record<string, string> = {};
+        let translatedAnn = "";
 
         let index = 0;
         categories.forEach((c) => {
@@ -458,9 +470,16 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           index++;
         });
 
+        if (announcementIndex !== -1) {
+          translatedAnn = translatedArray[announcementIndex] || store.announcement_text || "";
+        }
+
         setTranslatedCategories((prev) => ({ ...prev, [lang]: catTranslations }));
         setTranslatedProducts((prev) => ({ ...prev, [lang]: prodTranslations }));
         setTranslatedOptions((prev) => ({ ...prev, [lang]: optTranslations }));
+        if (translatedAnn) {
+          setTranslatedAnnouncements((prev) => ({ ...prev, [lang]: translatedAnn }));
+        }
         setTranslatedLangs((prev) => ({ ...prev, [lang]: true }));
       } catch (err) {
         console.error("Catalog translation failed:", err);
@@ -470,7 +489,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     };
 
     performTranslation();
-  }, [lang, mounted, categories, products]);
+  }, [lang, mounted, categories, products, store.announcement_text]);
 
   const handleLangChange = (newLang: "ar" | "tr" | "en") => {
     setLang(newLang);
@@ -627,47 +646,50 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       </div>
 
       {/* Announcement Bar Marquee */}
-      {store.announcement_text && (
-        <div
-          style={{
-            background: "linear-gradient(90deg, #0d9488, var(--color-primary))",
-            color: "#ffffff",
-            fontSize: "0.8125rem",
-            fontWeight: 750,
-            padding: "0.45rem 0",
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            borderBottom: "1.5px solid rgba(0,0,0,0.08)",
-          }}
-        >
+      {store.announcement_text && (() => {
+        const annText = lang === "ar" ? store.announcement_text : (translatedAnnouncements[lang] || store.announcement_text);
+        return (
           <div
-            className="announcement-marquee"
             style={{
-              display: "inline-block",
+              background: "linear-gradient(90deg, #0d9488, var(--color-primary))",
+              color: "#ffffff",
+              fontSize: "0.8125rem",
+              fontWeight: 750,
+              padding: "0.45rem 0",
+              overflow: "hidden",
               whiteSpace: "nowrap",
-              paddingLeft: t.dir === "rtl" ? "0" : "100%",
-              paddingRight: t.dir === "rtl" ? "100%" : "0",
-              animation: `${t.dir === "rtl" ? "marquee-rtl" : "marquee-ltr"} 18s linear infinite`,
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              borderBottom: "1.5px solid rgba(0,0,0,0.08)",
             }}
           >
-            {store.announcement_text}
-          </div>
+            <div
+              className="announcement-marquee"
+              style={{
+                display: "inline-block",
+                whiteSpace: "nowrap",
+                paddingLeft: t.dir === "rtl" ? "0" : "100%",
+                paddingRight: t.dir === "rtl" ? "100%" : "0",
+                animation: `${t.dir === "rtl" ? "marquee-rtl" : "marquee-ltr"} 18s linear infinite`,
+              }}
+            >
+              {annText}
+            </div>
 
-          <style>{`
-            @keyframes marquee-ltr {
-              0%   { transform: translateX(0%); }
-              100% { transform: translateX(-100%); }
-            }
-            @keyframes marquee-rtl {
-              0%   { transform: translateX(0%); }
-              100% { transform: translateX(100%); }
-            }
-          `}</style>
-        </div>
-      )}
+            <style>{`
+              @keyframes marquee-ltr {
+                0%   { transform: translateX(0%); }
+                100% { transform: translateX(-100%); }
+              }
+              @keyframes marquee-rtl {
+                0%   { transform: translateX(0%); }
+                100% { transform: translateX(100%); }
+              }
+            `}</style>
+          </div>
+        );
+      })()}
 
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* Premium Sticky Top Header                                            */}
