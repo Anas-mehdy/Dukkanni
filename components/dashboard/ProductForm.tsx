@@ -608,9 +608,9 @@ export default function ProductForm({ product }: ProductFormProps) {
         {/* is_active toggle */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <p style={{ fontSize: "0.9375rem", fontWeight: 700 }}>متوفر في المتجر</p>
+            <p style={{ fontSize: "0.9375rem", fontWeight: 700 }}>ظهور المنتج في المتجر</p>
             <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
-              {form.is_active ? "يظهر للعملاء ويمكن إضافته للسلة" : "مخفي عن العملاء"}
+              {form.is_active ? "ظاهر للعملاء (يمكنهم تصفحه وطلبه)" : "مخفي عن العملاء (مخفي مؤقتاً)"}
             </p>
           </div>
           <label className="toggle">

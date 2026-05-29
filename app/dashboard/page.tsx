@@ -237,7 +237,7 @@ export default function DashboardPage() {
         {stats ? (
           <>
             <StatCard label="إجمالي المنتجات"  value={stats.products}       icon="📦" href="/dashboard/products" />
-            <StatCard label="منتجات متوفرة"     value={stats.activeProducts} icon="✅" href="/dashboard/products" />
+            <StatCard label="منتجات نشطة/ظاهرة" value={stats.activeProducts} icon="✅" href="/dashboard/products" />
             <StatCard label="طلبات قيد الانتظار" value={stats.pendingOrders}  icon="📋" href="/dashboard/orders" />
             <StatCard label="الفئات"            value="—"                    icon="📂" href="/dashboard/categories" />
           </>

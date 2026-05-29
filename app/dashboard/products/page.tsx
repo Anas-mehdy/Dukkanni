@@ -66,7 +66,7 @@ function ProductRow({
   const [toggling, setToggling] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
-  const handleToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     setToggling(true);
     await onToggle(product.id, product.is_active);
@@ -81,7 +81,7 @@ function ProductRow({
         alignItems: "center",
         gap:        "0.75rem",
         padding:    "0.75rem",
-        opacity:    product.is_active ? 1 : 0.6,
+        opacity:    product.is_active ? 1 : 0.65,
         transition: "opacity 0.2s",
       }}
     >
@@ -128,81 +128,110 @@ function ProductRow({
         <p style={{ fontSize: "0.875rem", color: "var(--color-primary)", fontWeight: 700, marginTop: "2px" }}>
           {product.price.toLocaleString("ar")} {currencySymbol}
         </p>
-        {product.categories && (
-          <span
-            className="badge badge-primary"
-            style={{ marginTop: "4px", fontSize: "0.6875rem" }}
-          >
-            {product.categories.name}
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginTop: "4px", flexWrap: "wrap" }}>
+          {product.categories && (
+            <span
+              className="badge badge-primary"
+              style={{ fontSize: "0.6875rem", margin: 0 }}
+            >
+              {product.categories.name}
+            </span>
+          )}
+          {!product.is_active && (
+            <span
+              className="badge"
+              style={{
+                fontSize: "0.6875rem",
+                background: "var(--color-warning-muted)",
+                color: "var(--color-warning)",
+                borderColor: "var(--color-warning-muted)",
+                borderWidth: "1.5px",
+                borderStyle: "solid",
+                margin: 0,
+              }}
+            >
+              👁‍🗨 مخفي
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Right side actions */}
       <div
-        style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem", flexShrink: 0 }}
+        style={{ display: "flex", gap: "0.375rem", alignItems: "center", flexShrink: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* is_active toggle */}
-        <label
-          className="toggle"
-          style={{ gap: "0.375rem" }}
-          title={product.is_active ? "متوفر" : "غير متوفر"}
+        {/* Edit Button */}
+        <Link
+          href={`/dashboard/products/${product.id}`}
+          id={`edit-product-${product.id}`}
+          className="btn-icon"
+          aria-label={`تعديل ${product.name}`}
+          style={{ width: "34px", height: "34px" }}
+          title="تعديل المنتج"
         >
-          <input
-            type="checkbox"
-            checked={product.is_active}
-            onChange={handleToggle}
-            disabled={toggling}
-            aria-label={`تبديل توفر ${product.name}`}
-          />
-          <span className="toggle-track" />
-          <span className="toggle-thumb" />
-        </label>
-        <span style={{ fontSize: "0.6875rem", color: product.is_active ? "var(--color-success)" : "var(--color-text-faint)", fontWeight: 600 }}>
-          {product.is_active ? "متوفر" : "غير متوفر"}
-        </span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </Link>
 
-        {/* Edit / Delete */}
-        <div style={{ display: "flex", gap: "0.375rem", marginTop: "0.25rem" }}>
-          <Link
-            href={`/dashboard/products/${product.id}`}
-            id={`edit-product-${product.id}`}
+        {/* Hide/Show Button */}
+        <button
+          type="button"
+          className="btn-icon"
+          onClick={handleToggle}
+          disabled={toggling}
+          aria-label={product.is_active ? "إخفاء المنتج" : "إظهار المنتج"}
+          style={{
+            width: "34px",
+            height: "34px",
+            color: product.is_active ? "var(--color-text)" : "var(--color-warning)",
+            borderColor: product.is_active ? "var(--color-border)" : "var(--color-warning)",
+            background: product.is_active ? "transparent" : "var(--color-warning-muted)",
+          }}
+          title={product.is_active ? "إخفاء مؤقت" : "إظهار للعملاء"}
+        >
+          {product.is_active ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Delete Button */}
+        {confirmDel ? (
+          <button
             className="btn-icon"
-            aria-label={`تعديل ${product.name}`}
-            style={{ width: "34px", height: "34px" }}
+            onClick={() => onDelete(product.id)}
+            aria-label="تأكيد الحذف"
+            style={{ width: "34px", height: "34px", color: "var(--color-danger)", borderColor: "var(--color-danger)" }}
+            title="تأكيد الحذف النهائي"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              <polyline points="20 6 9 17 4 12"/>
             </svg>
-          </Link>
-
-          {confirmDel ? (
-            <button
-              className="btn-icon"
-              onClick={() => onDelete(product.id)}
-              aria-label="تأكيد الحذف"
-              style={{ width: "34px", height: "34px", color: "var(--color-danger)", borderColor: "var(--color-danger)" }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </button>
-          ) : (
-            <button
-              className="btn-icon"
-              onClick={() => setConfirmDel(true)}
-              aria-label={`حذف ${product.name}`}
-              style={{ width: "34px", height: "34px" }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-              </svg>
-            </button>
-          )}
-        </div>
+          </button>
+        ) : (
+          <button
+            className="btn-icon"
+            onClick={() => setConfirmDel(true)}
+            aria-label={`حذف ${product.name}`}
+            style={{ width: "34px", height: "34px" }}
+            title="حذف المنتج نهائياً"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -277,13 +306,13 @@ export default function ProductsPage() {
         body:    JSON.stringify({ is_active: !currentValue }),
       });
       if (!res.ok) throw new Error();
-      toast.success(currentValue ? "المنتج أصبح غير متوفر" : "المنتج أصبح متوفراً ✓");
+      toast.success(currentValue ? "تم إخفاء المنتج مؤقتاً" : "تم إظهار المنتج للعملاء ✓");
     } catch {
       // Revert on failure
       setProducts((prev) =>
         prev.map((p) => p.id === id ? { ...p, is_active: currentValue } : p)
       );
-      toast.error("خطأ في تحديث حالة المنتج");
+      toast.error("حدث خطأ أثناء تعديل ظهور المنتج");
     }
   };
 
@@ -312,8 +341,8 @@ export default function ProductsPage() {
         <h1 style={{ fontSize: "1.25rem", fontWeight: 800 }}>المنتجات</h1>
         {!loading && (
           <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
-            {products.length} منتج — {activeCount} متوفر
-            {inactiveCount > 0 && ` · ${inactiveCount} غير متوفر`}
+            {products.length} منتج — {activeCount} ظاهر للعملاء
+            {inactiveCount > 0 && ` · ${inactiveCount} مخفي مؤقتاً`}
           </p>
         )}
       </div>
