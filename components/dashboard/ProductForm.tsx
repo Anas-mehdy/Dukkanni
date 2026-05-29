@@ -499,6 +499,7 @@ export default function ProductForm({ product }: ProductFormProps) {
         {/* Upload Zone */}
         {form.images.length < 5 ? (
           <ImageUpload
+            key={form.images.length}
             currentImageUrl={null}
             onUploadComplete={addImageUrl}
             disabled={saving}
