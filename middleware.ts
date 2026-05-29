@@ -90,6 +90,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     "dukkanni", "www", "mail", "app", "store", "shop",
     "demo", "test", "dev", "staging", "prod", "static",
     "assets", "images", "media", "cdn", "health", "status",
+    "reset-password",
   ]);
 
   if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain) && !pathname.startsWith("/api") && !STATIC_SKIP_REGEX.test(pathname)) {

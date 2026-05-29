@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -20,8 +20,9 @@ const resetPasswordSchema = z.object({
 
 type ResetForm = z.infer<typeof resetPasswordSchema>;
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [password, setPassword] = useState("");
@@ -31,17 +32,40 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Guard: Check if a recovery session is active. If not, redirect to login
+  // Exchange recovery code for session (PKCE flow support) or verify active session
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      // In Supabase password recovery flow, clicking the link logs the user in with a temporary session
-      if (!session) {
-        // We can allow them to stay, but if updateUser fails, it means they didn't come from a reset link.
+    const handleAuthFlow = async () => {
+      // 1. Check if we have a PKCE code in the URL query params
+      const code = searchParams.get("code");
+      if (code) {
+        setSubmitting(true);
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("PKCE Code exchange error:", error.message);
+            setApiError("انتهت صلاحية رابط إعادة التعيين أو تم استخدامه مسبقاً. يرجى طلب رابط جديد.");
+          }
+        } catch (err) {
+          console.error("Catch code exchange error:", err);
+          setApiError("حدث خطأ أثناء مصادقة جلسة إعادة التعيين.");
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+
+      // 2. Otherwise check if we already have an active session (Implicit flow/hash or stored cookie)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          // If no session is active and no code query param, the user might have opened page directly
+        }
+      } catch (err) {
+        console.error("Error getting session:", err);
       }
     };
-    checkSession();
-  }, [supabase]);
+    handleAuthFlow();
+  }, [supabase, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +250,30 @@ export default function ResetPasswordPage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-xl)",
+            padding: "3rem 2rem",
+            textAlign: "center",
+            color: "var(--color-text-muted)",
+            fontFamily: "var(--font-cairo), sans-serif",
+          }}
+        >
+          جاري التحميل...
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
 
