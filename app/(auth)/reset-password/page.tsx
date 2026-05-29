@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
@@ -32,12 +32,18 @@ function ResetPasswordContent() {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // A ref to prevent duplicate/double exchange of the single-use PKCE code (e.g. in React Strict Mode)
+  const codeExchangedRef = useRef(false);
+
   // Exchange recovery code for session (PKCE flow support) or verify active session
   useEffect(() => {
     const handleAuthFlow = async () => {
       // 1. Check if we have a PKCE code in the URL query params
       const code = searchParams.get("code");
       if (code) {
+        if (codeExchangedRef.current) return;
+        codeExchangedRef.current = true;
+
         setSubmitting(true);
         try {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
