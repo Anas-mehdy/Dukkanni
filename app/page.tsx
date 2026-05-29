@@ -96,6 +96,29 @@ export default async function RootPage() {
 
         {/* ── Visual Mobile Mockup ── */}
         <PhoneSimulator />
+
+        {/* Live Demo Link Card */}
+        <div className="mt-12 max-w-lg mx-auto p-5 bg-[var(--color-surface)] border border-emerald-500/20 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.03)] flex flex-col sm:flex-row items-center justify-between gap-5 transition-all hover:border-emerald-500/40 transform hover:-translate-y-0.5 duration-200">
+          <div className="text-right flex items-start gap-3">
+            <span className="text-2xl mt-0.5 select-none">🌸</span>
+            <div>
+              <h4 className="text-sm font-extrabold text-[var(--color-text)] mb-1">
+                تصفح متجر الياسمين كـ مثال حي
+              </h4>
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed font-medium">
+                شاهد كيف يظهر المتجر لعملائك على الواقع، وجرّب الواجهة والسرعة بنفسك الآن.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://jasmine.dukkanni.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto flex-shrink-0 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold rounded-xl text-xs transition-all duration-200 text-center shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
+          >
+            تصفح المتجر الحي 🌐
+          </a>
+        </div>
       </section>
 
       {/* ── 3. CORE FEATURES SECTION ── */}
