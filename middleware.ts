@@ -150,10 +150,6 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           );
         },
       },
-      cookieOptions: {
-        domain: process.env.NODE_ENV === "production" ? ".dukkanni.com" : undefined,
-        path: "/",
-      },
     }
   );
 

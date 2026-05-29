@@ -44,10 +44,6 @@ export async function createClient(): Promise<any> {
           }
         },
       },
-      cookieOptions: {
-        domain: process.env.NODE_ENV === "production" ? ".dukkanni.com" : undefined,
-        path: "/",
-      },
     }
   );
 }
