@@ -42,6 +42,8 @@ export async function GET() {
   try {
     // Use the privileged admin client to select all stores, bypassing standard merchant RLS policies
     const adminDb = createAdminClient();
+    
+    // 1. Fetch all stores
     const { data: stores, error } = await adminDb
       .from("stores")
       .select(`
@@ -61,6 +63,22 @@ export async function GET() {
 
     if (error) throw error;
 
+    // 2. Fetch total page view visitors count platform-wide
+    const { count: totalViews, error: viewsError } = await adminDb
+      .from("store_analytics")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "view");
+
+    if (viewsError) throw viewsError;
+
+    // 3. Fetch total WhatsApp clicks count platform-wide
+    const { count: totalClicks, error: clicksError } = await adminDb
+      .from("store_analytics")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "whatsapp_click");
+
+    if (clicksError) throw clicksError;
+
     const enrichedStores = (stores || []).map((s: any) => {
       return {
         ...s,
@@ -70,7 +88,11 @@ export async function GET() {
       };
     });
 
-    return ok({ stores: enrichedStores });
+    return ok({ 
+      stores: enrichedStores,
+      totalViews: totalViews ?? 0,
+      totalClicks: totalClicks ?? 0
+    });
   } catch (e: any) {
     console.error("[GET /api/admin/subscriptions]", e);
     return err("خطأ أثناء تحميل البيانات", 500);

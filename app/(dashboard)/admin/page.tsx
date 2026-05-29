@@ -24,6 +24,10 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [submittingId, setSubmittingId] = useState<string | null>(null);
 
+  // Total platform analytics
+  const [totalViews, setTotalViews] = useState<number>(0);
+  const [totalClicks, setTotalClicks] = useState<number>(0);
+
   // Fetch all stores and KPIs
   const fetchData = async () => {
     try {
@@ -33,6 +37,8 @@ export default function AdminDashboard() {
         throw new Error(data.error || "خطأ غير متوقع");
       }
       setStores(data.data.stores || []);
+      setTotalViews(data.data.totalViews ?? 0);
+      setTotalClicks(data.data.totalClicks ?? 0);
     } catch (e: any) {
       setError(e.message || "فشل تحميل لوحة تحكم المسؤول");
     } finally {
@@ -157,6 +163,14 @@ export default function AdminDashboard() {
         <div style={kpiCardStyle}>
           <span style={kpiTitleStyle}>اشتراكات مدفوعة نشطة 🟢</span>
           <span style={kpiValueStyle}>{activePaidTiers}</span>
+        </div>
+        <div style={kpiCardStyle}>
+          <span style={kpiTitleStyle}>إجمالي زوار المنصة 👁️</span>
+          <span style={kpiValueStyle}>{totalViews.toLocaleString()}</span>
+        </div>
+        <div style={kpiCardStyle}>
+          <span style={kpiTitleStyle}>إجمالي نقرات الطلب 📈</span>
+          <span style={kpiValueStyle}>{totalClicks.toLocaleString()}</span>
         </div>
         <div style={{ ...kpiCardStyle, background: "var(--color-primary-muted)", border: "1.5px solid var(--color-primary)" }}>
           <span style={{ ...kpiTitleStyle, color: "var(--color-primary)" }}>الإيرادات الشهرية المتوقعة 💰</span>
