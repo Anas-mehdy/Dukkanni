@@ -65,6 +65,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [store, setStore]   = useState<StoreSummary | null>(null);
   const [stats, setStats]   = useState<Stats | null>(null);
+  const [analytics, setAnalytics] = useState<{ views: number; clicks: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const [generatingQR, setGeneratingQR] = useState(false);
 
@@ -89,6 +90,12 @@ export default function DashboardPage() {
     fetch("/api/orders?status=pending&count=true")
       .then((r) => r.json())
       .then((j) => setStats((prev) => ({ ...prev!, pendingOrders: j.data?.count ?? 0 })))
+      .catch(() => {});
+
+    // Fetch store analytics
+    fetch("/api/store/analytics")
+      .then((r) => r.json())
+      .then((j) => setAnalytics(j.data ?? null))
       .catch(() => {});
   }, []);
 
@@ -246,6 +253,25 @@ export default function DashboardPage() {
             <div key={i} className="skeleton" style={{ height: "100px", borderRadius: "var(--radius-lg)" }} />
           ))
         )}
+      </div>
+
+      {/* Current Month Analytics Section */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: "0.625rem" }}>
+          📊 إحصائيات الشهر الحالي (30 يوم)
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <StatCard
+            label="إجمالي زوار المتجر"
+            value={analytics ? analytics.views : 0}
+            icon="👁️"
+          />
+          <StatCard
+            label="الطلبات المكتملة"
+            value={analytics ? analytics.clicks : 0}
+            icon="📈"
+          />
+        </div>
       </div>
 
       {/* Quick actions */}

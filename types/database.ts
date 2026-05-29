@@ -37,6 +37,8 @@ export interface StoreRow {
   logo_url:      string | null;
   currency_code: string;
   is_active:     boolean;
+  announcement_text: string | null;
+  description:   string | null;
   created_at:    string;
   updated_at:    string;
 }
@@ -58,6 +60,7 @@ export interface ProductRow {
   price:       number;
   image_url:   string | null;
   is_active:   boolean;
+  is_available: boolean;
   sort_order:  number;
   options:     Json;
   created_at:  string;
@@ -137,6 +140,16 @@ export interface Database {
         Row:    OrderItemRow;
         Insert: OrderItemInsert;
         Update: OrderItemUpdate;
+      };
+      store_analytics: {
+        Row: {
+          id:         string;
+          store_id:   string;
+          event_type: "view" | "whatsapp_click";
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["store_analytics"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["store_analytics"]["Row"]>;
       };
     };
     Views: {

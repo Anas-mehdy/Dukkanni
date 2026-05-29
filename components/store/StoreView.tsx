@@ -27,9 +27,9 @@ import { locales } from "@/lib/locales";
 // ---------------------------------------------------------------------------
 
 interface StoreViewProps {
-  store:      Pick<StoreRow, "id" | "name" | "slug" | "logo_url" | "currency_code">;
+  store:      Pick<StoreRow, "id" | "name" | "slug" | "logo_url" | "currency_code"> & { announcement_text?: string | null; description?: string | null };
   categories: Pick<CategoryRow, "id" | "name" | "sort_order">[];
-  products:   Pick<ProductRow, "id" | "name" | "price" | "image_url" | "is_active" | "sort_order" | "category_id" | "options">[];
+  products:   Pick<ProductRow, "id" | "name" | "price" | "image_url" | "is_active" | "is_available" | "sort_order" | "category_id" | "options">[];
 }
 
 // ---------------------------------------------------------------------------
@@ -215,79 +215,100 @@ function ProductCard({
         })()}
       </div>
 
-      {/* Sleek Pill quantitative adjuster stepper [- 0 +] (visible by default) */}
-      <div
-        style={{
-          display:        "flex",
-          alignItems:     "center",
-          justifyContent: "space-between",
-          background:     "var(--color-surface-2)",
-          borderRadius:   "var(--radius-full)",
-          padding:        "0.2rem",
-          border:         "1.5px solid var(--color-border)",
-          marginTop:      "auto"
-        }}
-      >
-        <button
-          onClick={(e) => { e.stopPropagation(); if (quantity > 0) onDecrement(); }}
-          disabled={quantity === 0}
-          aria-label={lang === "ar" ? "تقليل" : lang === "tr" ? "azalt" : "decrease"}
+      {/* Sleek Pill quantitative adjuster stepper [- 0 +] OR Out of Stock Badge */}
+      {product.is_available !== false ? (
+        <div
           style={{
-            width:        "26px",
-            height:       "26px",
-            borderRadius: "50%",
-            background:   quantity > 0 ? "var(--color-surface-3)" : "transparent",
-            color:        quantity > 0 ? "var(--color-text)" : "var(--color-text-faint)",
-            border:       "none",
-            fontSize:     "0.9rem",
-            fontWeight:   800,
-            display:      "flex",
-            alignItems:   "center",
-            justifyContent: "center",
-            cursor:       quantity > 0 ? "pointer" : "default",
-            transition:   "all 0.15s ease"
+            display:        "flex",
+            alignItems:     "center",
+            justifyContent: "space-between",
+            background:     "var(--color-surface-2)",
+            borderRadius:   "var(--radius-full)",
+            padding:        "0.2rem",
+            border:         "1.5px solid var(--color-border)",
+            marginTop:      "auto"
           }}
         >
-          {quantity === 1 ? "×" : "−"}
-        </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (quantity > 0) onDecrement(); }}
+            disabled={quantity === 0}
+            aria-label={lang === "ar" ? "تقليل" : lang === "tr" ? "azalt" : "decrease"}
+            style={{
+              width:        "26px",
+              height:       "26px",
+              borderRadius: "50%",
+              background:   quantity > 0 ? "var(--color-surface-3)" : "transparent",
+              color:        quantity > 0 ? "var(--color-text)" : "var(--color-text-faint)",
+              border:       "none",
+              fontSize:     "0.9rem",
+              fontWeight:   800,
+              display:      "flex",
+              alignItems:   "center",
+              justifyContent: "center",
+              cursor:       quantity > 0 ? "pointer" : "default",
+              transition:   "all 0.15s ease"
+            }}
+          >
+            {quantity === 1 ? "×" : "−"}
+          </button>
 
-        <span
+          <span
+            style={{
+              fontWeight: 800,
+              fontSize:   "0.875rem",
+              color:      quantity > 0 ? "var(--color-primary)" : "var(--color-text-muted)",
+              minWidth:   "18px",
+              textAlign:  "center"
+            }}
+          >
+            {quantity}
+          </span>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); if (quantity === 0) onAdd(); else onIncrement(); }}
+            aria-label={lang === "ar" ? "زيادة" : lang === "tr" ? "artır" : "increase"}
+            style={{
+              width:        "26px",
+              height:       "26px",
+              borderRadius: "50%",
+              background:   "var(--color-success)",
+              color:        "#ffffff",
+              border:       "none",
+              fontSize:     "1rem",
+              fontWeight:   800,
+              display:      "flex",
+              alignItems:   "center",
+              justifyContent: "center",
+              cursor:       "pointer",
+              boxShadow:    "0 1.5px 5px var(--color-success-muted)",
+              transition:   "transform 0.1s"
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
+            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+          >
+            +
+          </button>
+        </div>
+      ) : (
+        <button
+          disabled
           style={{
+            width: "100%",
+            padding: "0.5rem",
+            borderRadius: "var(--radius-full)",
+            background: "var(--color-surface-3)",
+            color: "var(--color-text-faint)",
+            border: "1.5px dashed var(--color-border)",
+            fontSize: "0.8125rem",
             fontWeight: 800,
-            fontSize:   "0.875rem",
-            color:      quantity > 0 ? "var(--color-primary)" : "var(--color-text-muted)",
-            minWidth:   "18px",
-            textAlign:  "center"
+            marginTop: "auto",
+            cursor: "not-allowed",
+            textAlign: "center"
           }}
         >
-          {quantity}
-        </span>
-
-        <button
-          onClick={(e) => { e.stopPropagation(); if (quantity === 0) onAdd(); else onIncrement(); }}
-          aria-label={lang === "ar" ? "زيادة" : lang === "tr" ? "artır" : "increase"}
-          style={{
-            width:        "26px",
-            height:       "26px",
-            borderRadius: "50%",
-            background:   "var(--color-success)",
-            color:        "#ffffff",
-            border:       "none",
-            fontSize:     "1rem",
-            fontWeight:   800,
-            display:      "flex",
-            alignItems:   "center",
-            justifyContent: "center",
-            cursor:       "pointer",
-            boxShadow:    "0 1.5px 5px var(--color-success-muted)",
-            transition:   "transform 0.1s"
-          }}
-          onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
-          onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-        >
-          +
+          {lang === "ar" ? "نفد من المخزون" : lang === "tr" ? "Tükendi" : "Out of Stock"}
         </button>
-      </div>
+      )}
 
     </div>
   );
@@ -353,12 +374,27 @@ export default function StoreView({ store, categories, products }: StoreViewProp
 
   const t = mounted ? locales[lang] : locales["ar"];
 
-  // Global document direction synchronization (fixes layout off-center/tilting-left bugs globally)
+  // Global document direction synchronization (fixes layout off-center/tilting-left bugs globally) + Log view event
   useEffect(() => {
     if (!mounted) return;
     document.documentElement.dir = t.dir;
     document.documentElement.lang = lang;
-  }, [lang, mounted, t.dir]);
+
+    // Asynchronously log store view event
+    const logView = async () => {
+      try {
+        const { createPublicClient } = await import("@/lib/supabase/public");
+        const supabasePublic = createPublicClient();
+        await supabasePublic.from("store_analytics").insert({
+          store_id: store.id,
+          event_type: "view",
+        });
+      } catch (err) {
+        console.error("Failed to log view event:", err);
+      }
+    };
+    logView();
+  }, [mounted, t.dir, lang, store.id]);
 
   // Effect to automatically translate category, product, and option names when language switches
   useEffect(() => {
@@ -589,6 +625,49 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           </a>
         </span>
       </div>
+
+      {/* Announcement Bar Marquee */}
+      {store.announcement_text && (
+        <div
+          style={{
+            background: "linear-gradient(90deg, #0d9488, var(--color-primary))",
+            color: "#ffffff",
+            fontSize: "0.8125rem",
+            fontWeight: 750,
+            padding: "0.45rem 0",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            borderBottom: "1.5px solid rgba(0,0,0,0.08)",
+          }}
+        >
+          <div
+            className="announcement-marquee"
+            style={{
+              display: "inline-block",
+              whiteSpace: "nowrap",
+              paddingLeft: t.dir === "rtl" ? "0" : "100%",
+              paddingRight: t.dir === "rtl" ? "100%" : "0",
+              animation: `${t.dir === "rtl" ? "marquee-rtl" : "marquee-ltr"} 18s linear infinite`,
+            }}
+          >
+            {store.announcement_text}
+          </div>
+
+          <style>{`
+            @keyframes marquee-ltr {
+              0%   { transform: translateX(0%); }
+              100% { transform: translateX(-100%); }
+            }
+            @keyframes marquee-rtl {
+              0%   { transform: translateX(0%); }
+              100% { transform: translateX(100%); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* Premium Sticky Top Header                                            */}

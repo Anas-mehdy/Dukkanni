@@ -56,14 +56,17 @@ function ProductRow({
   product,
   currencySymbol,
   onToggle,
+  onToggleAvailable,
   onDelete,
 }: {
   product: ProductWithCategory;
   currencySymbol: string;
   onToggle: (id: string, current: boolean) => Promise<void>;
+  onToggleAvailable: (id: string, current: boolean) => Promise<void>;
   onDelete: (id: string) => void;
 }) {
   const [toggling, setToggling] = useState(false);
+  const [togglingAvailable, setTogglingAvailable] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
   const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -128,7 +131,7 @@ function ProductRow({
         <p style={{ fontSize: "0.875rem", color: "var(--color-primary)", fontWeight: 700, marginTop: "2px" }}>
           {product.price.toLocaleString("ar")} {currencySymbol}
         </p>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginTop: "4px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginTop: "4px", flexWrap: "wrap", width: "100%" }}>
           {product.categories && (
             <span
               className="badge badge-primary"
@@ -153,6 +156,41 @@ function ProductRow({
               👁‍🗨 مخفي
             </span>
           )}
+
+          {/* is_available stock toggle */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: product.is_available ? "var(--color-success)" : "var(--color-text-faint)",
+              cursor: "pointer",
+              userSelect: "none",
+              marginInlineStart: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={product.is_available !== false}
+              onChange={async (e) => {
+                e.stopPropagation();
+                setTogglingAvailable(true);
+                await onToggleAvailable(product.id, product.is_available !== false);
+                setTogglingAvailable(false);
+              }}
+              disabled={togglingAvailable}
+              style={{
+                width: "13px",
+                height: "13px",
+                cursor: "pointer",
+                accentColor: "var(--color-primary)",
+              }}
+            />
+            <span>{product.is_available !== false ? "متوفر" : "غير متوفر"}</span>
+          </label>
         </div>
       </div>
 
@@ -316,6 +354,29 @@ export default function ProductsPage() {
     }
   };
 
+  // ── Toggle is_available ──────────────────────────────────────────────────
+  const handleToggleAvailable = async (id: string, currentValue: boolean) => {
+    // Optimistic update
+    setProducts((prev) =>
+      prev.map((p) => p.id === id ? { ...p, is_available: !currentValue } : p)
+    );
+    try {
+      const res = await fetch(`/api/products?id=${id}`, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ is_available: !currentValue }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(currentValue ? "تم تعيين المنتج كغير متوفر في المستودع" : "تم تعيين المنتج كمتوفر ✓");
+    } catch {
+      // Revert on failure
+      setProducts((prev) =>
+        prev.map((p) => p.id === id ? { ...p, is_available: currentValue } : p)
+      );
+      toast.error("حدث خطأ أثناء تعديل توفر المنتج");
+    }
+  };
+
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     try {
@@ -436,6 +497,7 @@ export default function ProductsPage() {
               product={product}
               currencySymbol={currencySymbol}
               onToggle={handleToggle}
+              onToggleAvailable={handleToggleAvailable}
               onDelete={handleDelete}
             />
           ))}

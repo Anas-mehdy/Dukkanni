@@ -40,7 +40,7 @@ export async function generateMetadata({
 
   const { data: store } = await supabase
     .from("stores")
-    .select("name, logo_url")
+    .select("name, logo_url, description")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
@@ -54,7 +54,7 @@ export async function generateMetadata({
 
   const appUrl      = process.env.NEXT_PUBLIC_APP_URL ?? "https://dukkanni.com";
   const title       = `${store.name} — اطلب الآن عبر واتساب`;
-  const description = `تصفح منتجات ${store.name} وأضفها للسلة وأرسل طلبك مباشرة عبر واتساب بضغطة واحدة.`;
+  const description = store.description || `تصفح منتجات ${store.name} وأضفها للسلة وأرسل طلبك مباشرة عبر واتساب بضغطة واحدة.`;
 
   return {
     title,
@@ -96,7 +96,7 @@ export default async function StorePage({
   // ── Fetch store ───────────────────────────────────────────────────────────
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, slug, logo_url, currency_code, is_active")
+    .select("id, name, slug, logo_url, currency_code, is_active, announcement_text, description")
     .eq("slug", slug)
     .single();
 
@@ -115,7 +115,7 @@ export default async function StorePage({
   // ── Fetch active products ─────────────────────────────────────────────────
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, image_url, is_active, sort_order, category_id, options")
+    .select("id, name, price, image_url, is_active, is_available, sort_order, category_id, options")
     .eq("store_id", store.id)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })

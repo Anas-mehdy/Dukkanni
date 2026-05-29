@@ -75,6 +75,7 @@ export const productSchema = z.object({
     .default(null),
 
   is_active: z.boolean().default(true),
+  is_available: z.boolean().default(true),
 
   sort_order: z
     .number()

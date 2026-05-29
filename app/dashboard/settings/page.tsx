@@ -33,6 +33,8 @@ interface StoreData {
   whatsapp_e164: string | null;
   currency_code: string;
   logo_url:      string | null;
+  announcement_text?: string | null;
+  description?:   string | null;
 }
 
 type CountryHint = "TR" | "SA" | "AE" | "EG" | "IQ" | "KW" | "QA" | "OM" | "JO" | "MA";
@@ -84,6 +86,8 @@ const settingsSchema = z.object({
   whatsapp: z.string().trim().min(7, "رقم الواتساب قصير").max(20),
   countryHint: z.string(),
   currency_code: z.string().length(3),
+  description: z.string().trim().max(160, "الوصف لا يتجاوز 160 حرفاً").optional(),
+  announcement_text: z.string().trim().max(200, "شريط الإعلانات لا يتجاوز 200 حرفاً").optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -133,6 +137,8 @@ export default function SettingsPage() {
   const [countryHint,  setCountryHint]  = useState<CountryHint>("TR");
   const [currencyCode, setCurrencyCode] = useState("TRY");
   const [logoUrl,      setLogoUrl]      = useState<string | null>(null);
+  const [description,  setDescription]  = useState("");
+  const [announcementText, setAnnouncementText] = useState("");
 
   // Field errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -155,6 +161,8 @@ export default function SettingsPage() {
         setWhatsapp(s.whatsapp_e164 ?? "");
         setCurrencyCode(s.currency_code);
         setLogoUrl(s.logo_url);
+        setDescription(s.description ?? "");
+        setAnnouncementText(s.announcement_text ?? "");
         originalSlug.current = s.slug;
       })
       .catch(() => toast.error("تعذّر تحميل بيانات المتجر"))
@@ -197,7 +205,15 @@ export default function SettingsPage() {
     setErrors({});
 
     // Zod validation
-    const parsed = settingsSchema.safeParse({ name, slug, whatsapp, countryHint, currency_code: currencyCode });
+    const parsed = settingsSchema.safeParse({
+      name,
+      slug,
+      whatsapp,
+      countryHint,
+      currency_code: currencyCode,
+      description,
+      announcement_text: announcementText,
+    });
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
       parsed.error.issues.forEach((i) => {
@@ -226,6 +242,8 @@ export default function SettingsPage() {
         countryHint,
         currency_code: currencyCode,
         logo_url: logoUrl,
+        description: description || null,
+        announcement_text: announcementText || null,
       }),
     });
 
@@ -410,6 +428,41 @@ export default function SettingsPage() {
                 {APP_URL.includes("localhost") ? ".localhost:3000" : ".dukkanni.com"}
               </span>
             </div>
+
+            {/* Store Description */}
+            <div style={{ marginTop: "1rem" }}>
+              <label htmlFor="store-description" style={{ ...labelStyle, marginBottom: "0.375rem" }}>
+                وصف المتجر <span style={{ color: "var(--color-text-faint)" }}>(اختياري)</span>
+              </label>
+              <textarea
+                id="store-description"
+                className="input-base"
+                style={{
+                  width: "100%",
+                  minHeight: "70px",
+                  padding: "0.75rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "1.5px solid var(--color-border)",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                  fontFamily: "var(--font-cairo), sans-serif",
+                  fontSize: "0.9rem",
+                  resize: "vertical"
+                }}
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setErrors((p) => ({ ...p, description: "" }));
+                }}
+                placeholder="مثال: متجرنا لبيع أشهى المأكولات والحلويات المنزلية الطازجة شحن لكافة الولايات."
+                maxLength={160}
+                disabled={submitting}
+              />
+              {errors.description && <p style={errorStyle}>{errors.description}</p>}
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "0.25rem" }}>
+                وصف قصير لمتجرك يظهر للعملاء عند مشاركة رابط المتجر على شبكات التواصل (بحد أقصى 160 حرفاً).
+              </p>
+            </div>
           </div>
         </section>
 
@@ -502,6 +555,36 @@ export default function SettingsPage() {
 
           <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "0.5rem" }}>
             تُستخدم لعرض الأسعار في المتجر العام وواجهة الطلبات.
+          </p>
+        </section>
+
+        {/* ── Section 5: Announcement Bar ── */}
+        <section className="card" style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
+          <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: "0.875rem" }}>
+            📢 شريط الإعلانات العلوي للمتجر
+          </p>
+
+          <input
+            id="announcement-input"
+            type="text"
+            placeholder="مثال: شحن مجاني لكافة الولايات التركية بمناسبة العيد! 🎁"
+            value={announcementText}
+            onChange={(e) => setAnnouncementText(e.target.value)}
+            disabled={submitting}
+            style={{
+              width:      "100%",
+              padding:    "0.75rem",
+              borderRadius: "var(--radius-md)",
+              border:     "1.5px solid var(--color-border)",
+              background: "var(--color-surface)",
+              color:      "var(--color-text)",
+              fontFamily: "var(--font-cairo), sans-serif",
+              fontSize:   "0.9rem",
+            }}
+          />
+
+          <p style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", marginTop: "0.5rem", lineHeight: 1.5 }}>
+            سيتم عرض هذا النص كشريط متحرك في أعلى متجرك لجذب انتباه العملاء. اتركه فارغاً لإخفائه.
           </p>
         </section>
 

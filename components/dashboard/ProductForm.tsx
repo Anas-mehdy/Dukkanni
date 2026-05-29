@@ -47,6 +47,7 @@ interface FormState {
   price:       string;   // kept as string for input control, parsed on submit
   category_id: string;
   is_active:   boolean;
+  is_available: boolean;
   sort_order:  string;
   image_url:   string | null;
   options:     ProductOption[];
@@ -74,6 +75,7 @@ export default function ProductForm({ product }: ProductFormProps) {
     price:       product?.price != null ? String(product.price) : "",
     category_id: product?.category_id ?? "",
     is_active:   product?.is_active   ?? true,
+    is_available: product?.is_available ?? true,
     sort_order:  product?.sort_order  != null ? String(product.sort_order) : "0",
     image_url:   product?.image_url   ?? null,
     options:     ((product?.options as unknown as ProductOption[]) ?? []).map((opt) => ({
@@ -223,6 +225,7 @@ export default function ProductForm({ product }: ProductFormProps) {
         price:       form.price === "" ? 0 : parseFloat(form.price),
         category_id: form.category_id || null,
         is_active:   form.is_active,
+        is_available: form.is_available,
         sort_order:  parseInt(form.sort_order, 10) || 0,
         image_url:   form.image_url ?? null,
         options:     form.options
@@ -620,6 +623,29 @@ export default function ProductForm({ product }: ProductFormProps) {
               onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
               disabled={saving}
               id="product-is-active"
+            />
+            <span className="toggle-track" />
+            <span className="toggle-thumb" />
+          </label>
+        </div>
+
+        <div className="divider" style={{ margin: "0.5rem 0" }} />
+
+        {/* is_available stock toggle */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <p style={{ fontSize: "0.9375rem", fontWeight: 700 }}>متوفر في المستودع</p>
+            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
+              {form.is_available ? "متوفر حالياً ويمكن شراؤه وإضافته للسلة" : "نفد من المخزون (سيظهر كغير متوفر للعملاء)"}
+            </p>
+          </div>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={form.is_available}
+              onChange={(e) => setForm((prev) => ({ ...prev, is_available: e.target.checked }))}
+              disabled={saving}
+              id="product-is-available"
             />
             <span className="toggle-track" />
             <span className="toggle-thumb" />

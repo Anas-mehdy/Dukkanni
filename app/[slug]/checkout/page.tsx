@@ -115,6 +115,7 @@ export default function CheckoutPage({
     en: {}
   });
   const [translatedLangs, setTranslatedLangs] = useState<Record<string, boolean>>({ ar: true });
+  const [storeId, setStoreId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("dukkanni_store_lang") as "ar" | "tr" | "en";
@@ -123,6 +124,26 @@ export default function CheckoutPage({
     }
     setMounted(true);
   }, []);
+
+  // Fetch Store ID for analytics tracking
+  useEffect(() => {
+    if (!slug) return;
+    const fetchStoreId = async () => {
+      try {
+        const { createPublicClient } = await import("@/lib/supabase/public");
+        const supabasePublic = createPublicClient();
+        const { data } = await supabasePublic
+          .from("stores")
+          .select("id")
+          .eq("slug", slug)
+          .maybeSingle();
+        if (data) setStoreId(data.id);
+      } catch (err) {
+        console.error("Failed to load store ID for analytics:", err);
+      }
+    };
+    fetchStoreId();
+  }, [slug]);
 
   const t = mounted ? locales[lang] : locales["ar"];
 
@@ -349,6 +370,23 @@ export default function CheckoutPage({
 
       // ── Step 5: Open WhatsApp deep link ─────────────────────────────────
       window.open(url, "_blank");
+
+      // Asynchronously log background whatsapp_click event
+      if (storeId) {
+        const logClick = async () => {
+          try {
+            const { createPublicClient } = await import("@/lib/supabase/public");
+            const supabasePublic = createPublicClient();
+            await supabasePublic.from("store_analytics").insert({
+              store_id: storeId,
+              event_type: "whatsapp_click",
+            });
+          } catch (err) {
+            console.error("Failed to log whatsapp click:", err);
+          }
+        };
+        logClick();
+      }
     } catch {
       setApiError(lang === "tr" ? "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin." : lang === "en" ? "Connection error. Please check your internet and try again." : "خطأ في الاتصال. تأكد من اتصالك بالإنترنت وأعد المحاولة.");
     } finally {

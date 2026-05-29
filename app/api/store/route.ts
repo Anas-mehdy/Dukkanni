@@ -67,6 +67,8 @@ const patchSchema = z.object({
     .optional(),
 
   logo_url: z.string().url("رابط الشعار غير صالح").nullable().optional(),
+  announcement_text: z.string().trim().max(200, "شريط الإعلانات لا يتجاوز 200 حرفاً").nullable().optional(),
+  description: z.string().trim().max(160, "وصف المتجر لا يتجاوز 160 حرفاً").nullable().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -93,7 +95,7 @@ export async function GET() {
 
   const { data: store, error: storeErr } = await supabase
     .from("stores")
-    .select("id, name, slug, whatsapp_e164, currency_code, logo_url, is_active, plan_type, trial_ends_at, subscription_status, subscription_ends_at")
+    .select("id, name, slug, whatsapp_e164, currency_code, logo_url, is_active, plan_type, trial_ends_at, subscription_status, subscription_ends_at, announcement_text, description")
     .eq("owner_id", user.id)
     .single();
 
@@ -130,7 +132,7 @@ export async function PATCH(request: NextRequest) {
     return err(Object.values(issues)[0] ?? "بيانات غير صحيحة", 422, issues);
   }
 
-  const { name, slug, whatsapp, countryHint, currency_code, logo_url } =
+  const { name, slug, whatsapp, countryHint, currency_code, logo_url, announcement_text, description } =
     parsed.data;
 
   // ── Resolve merchant's store ─────────────────────────────────────────────────
@@ -185,6 +187,8 @@ export async function PATCH(request: NextRequest) {
   if (whatsapp_e164)    updatePayload.whatsapp_e164 = whatsapp_e164;
   if (currency_code)    updatePayload.currency_code = currency_code;
   if (logo_url !== undefined) updatePayload.logo_url = logo_url; // null is valid (clear logo)
+  if (announcement_text !== undefined) updatePayload.announcement_text = announcement_text;
+  if (description !== undefined)       updatePayload.description       = description;
 
   if (Object.keys(updatePayload).length === 0) {
     return err("لا توجد حقول للتحديث", 400);
@@ -195,7 +199,7 @@ export async function PATCH(request: NextRequest) {
     .from("stores")
     .update(updatePayload)
     .eq("id", store.id)
-    .select("id, name, slug, whatsapp_e164, currency_code, logo_url")
+    .select("id, name, slug, whatsapp_e164, currency_code, logo_url, announcement_text, description")
     .single();
 
   if (updateErr) {
