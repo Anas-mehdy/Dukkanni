@@ -34,6 +34,7 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/public";
+import { parseProductOptions } from "@/lib/validations";
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
     // Parse cumulative options pricing modifiers
     let resolvedPrice = product.price;
     const details: string[] = [];
-    const productOptions = (product.options as any[]) ?? [];
+    const { variants: productOptions } = parseProductOptions(product.options);
 
     if (item.selectedOptions && item.selectedOptions.length > 0) {
       item.selectedOptions.forEach((selOpt) => {

@@ -87,13 +87,51 @@ export const productSchema = z.object({
   // image_url is handled separately via the upload endpoint
   image_url: z.string().url("رابط الصورة غير صالح").nullable().optional().default(null),
 
-  options: z.array(productOptionSchema).nullable().optional().default([]),
+  options: z.union([
+    z.array(productOptionSchema),
+    z.object({
+      variants: z.array(productOptionSchema).nullable().optional().default([]),
+      description: z.string().trim().nullable().optional().default(null),
+      images: z.array(z.string()).nullable().optional().default([]),
+    })
+  ]).nullable().optional().default([]),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema>;
 
 export const productUpdateSchema = productSchema.partial();
 export type ProductUpdateValues = z.infer<typeof productUpdateSchema>;
+
+export interface ParsedProductOptions {
+  variants: z.infer<typeof productOptionSchema>[];
+  description: string | null;
+  images: string[];
+}
+
+/**
+ * Robust helper function to normalize product options field (JSONB) into variants, description, and images.
+ * Gracefully handles legacy flat arrays, new structured objects, and null values.
+ */
+export function parseProductOptions(options: any): ParsedProductOptions {
+  if (!options) {
+    return { variants: [], description: null, images: [] };
+  }
+  if (Array.isArray(options)) {
+    return {
+      variants: options,
+      description: null,
+      images: [],
+    };
+  }
+  if (typeof options === "object") {
+    return {
+      variants: Array.isArray(options.variants) ? options.variants : [],
+      description: typeof options.description === "string" ? options.description : null,
+      images: Array.isArray(options.images) ? options.images : [],
+    };
+  }
+  return { variants: [], description: null, images: [] };
+}
 
 // ---------------------------------------------------------------------------
 // Store settings (used in Phase 4 settings page — defined now for completeness)

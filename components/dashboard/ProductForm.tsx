@@ -20,6 +20,7 @@ import ImageUpload from "@/components/dashboard/ImageUpload";
 import { useToast } from "@/components/ui/Toast";
 import { PRODUCT_NAME_MAX_CHARS } from "@/lib/constants";
 import type { CategoryRow, ProductRow } from "@/types/database";
+import { parseProductOptions } from "@/lib/validations";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,7 +33,7 @@ interface ProductFormProps {
 
 interface ProductOptionValue {
   value: string;
-  price: number | null;
+  price?: number | null;
 }
 
 interface ProductOption {
@@ -51,6 +52,8 @@ interface FormState {
   sort_order:  string;
   image_url:   string | null;
   options:     ProductOption[];
+  description: string;
+  images:      string[];
 }
 
 interface FormErrors {
@@ -58,6 +61,7 @@ interface FormErrors {
   price?:      string;
   category_id?: string;
   sort_order?: string;
+  description?: string;
   general?:    string;
 }
 
@@ -70,18 +74,23 @@ export default function ProductForm({ product }: ProductFormProps) {
   const { toast } = useToast();
   const isEdit  = !!product;
 
-  const [form, setForm] = useState<FormState>({
-    name:        product?.name        ?? "",
-    price:       product?.price != null ? String(product.price) : "",
-    category_id: product?.category_id ?? "",
-    is_active:   product?.is_active   ?? true,
-    is_available: product?.is_available ?? true,
-    sort_order:  product?.sort_order  != null ? String(product.sort_order) : "0",
-    image_url:   product?.image_url   ?? null,
-    options:     ((product?.options as unknown as ProductOption[]) ?? []).map((opt) => ({
-      ...opt,
-      rawInputText: opt.values ? opt.values.map((v) => v.value).join(", ") : "",
-    })),
+  const [form, setForm] = useState<FormState>(() => {
+    const parsed = parseProductOptions(product?.options);
+    return {
+      name:        product?.name        ?? "",
+      price:       product?.price != null ? String(product.price) : "",
+      category_id: product?.category_id ?? "",
+      is_active:   product?.is_active   ?? true,
+      is_available: product?.is_available ?? true,
+      sort_order:  product?.sort_order  != null ? String(product.sort_order) : "0",
+      image_url:   product?.image_url   ?? null,
+      options:     parsed.variants.map((opt) => ({
+        ...opt,
+        rawInputText: opt.values ? opt.values.map((v) => v.value).join(", ") : "",
+      })),
+      description: parsed.description ?? "",
+      images:      parsed.images ?? [],
+    };
   });
 
   const addOption = () => {
@@ -174,11 +183,59 @@ export default function ProductForm({ product }: ProductFormProps) {
     };
 
   const setImageUrl = useCallback((url: string) => {
-    setForm((prev) => ({ ...prev, image_url: url }));
+    setForm((prev) => {
+      const newImages = prev.images.includes(url) ? prev.images : [...prev.images, url];
+      return { ...prev, image_url: url, images: newImages };
+    });
   }, []);
 
   const clearImage = useCallback(() => {
     setForm((prev) => ({ ...prev, image_url: null }));
+  }, []);
+
+  const addImageUrl = useCallback((url: string) => {
+    setForm((prev) => {
+      const newImages = [...prev.images, url];
+      return {
+        ...prev,
+        images: newImages,
+        image_url: prev.image_url ?? url,
+      };
+    });
+  }, []);
+
+  const removeImageUrl = useCallback((index: number) => {
+    setForm((prev) => {
+      const newImages = prev.images.filter((_, idx) => idx !== index);
+      const wasCover = prev.image_url === prev.images[index];
+      const newCover = wasCover ? (newImages[0] ?? null) : prev.image_url;
+      return {
+        ...prev,
+        images: newImages,
+        image_url: newCover,
+      };
+    });
+  }, []);
+
+  const moveImageUrl = useCallback((index: number, direction: "up" | "down") => {
+    setForm((prev) => {
+      const newImages = [...prev.images];
+      const targetIdx = direction === "up" ? index - 1 : index + 1;
+      if (targetIdx < 0 || targetIdx >= newImages.length) return prev;
+      
+      const temp = newImages[index];
+      newImages[index] = newImages[targetIdx];
+      newImages[targetIdx] = temp;
+      
+      const wasCoverFirst = prev.image_url === prev.images[0];
+      const newCover = wasCoverFirst ? newImages[0] : prev.image_url;
+
+      return {
+        ...prev,
+        images: newImages,
+        image_url: newCover,
+      };
+    });
   }, []);
 
   // ── Client-side validation ────────────────────────────────────────────────
@@ -189,6 +246,10 @@ export default function ProductForm({ product }: ProductFormProps) {
       errs.name = "اسم المنتج مطلوب";
     } else if (form.name.trim().length > PRODUCT_NAME_MAX_CHARS) {
       errs.name = `الاسم لا يتجاوز ${PRODUCT_NAME_MAX_CHARS} حرفاً`;
+    }
+
+    if (form.description.trim().length > 1000) {
+      errs.description = "الوصف لا يتجاوز 1000 حرف";
     }
 
     const hasCustomOptionPrices = form.options.some((opt) => opt.hasCustomPrice && opt.values.length > 0);
@@ -220,6 +281,21 @@ export default function ProductForm({ product }: ProductFormProps) {
 
     setSaving(true);
     try {
+      const variants = form.options
+        .filter((opt) => opt.name.trim().length > 0 && opt.values.length > 0)
+        .map(({ name, hasCustomPrice, values }) => ({ name, hasCustomPrice, values }));
+
+      // If they have description or multiple images, store as structured metadata object.
+      // Otherwise, save as legacy flat variants list.
+      let optionsPayload: any = variants;
+      if (form.description.trim() || form.images.length > 0) {
+        optionsPayload = {
+          variants,
+          description: form.description.trim() || null,
+          images: form.images.length > 0 ? form.images : (form.image_url ? [form.image_url] : []),
+        };
+      }
+
       const payload = {
         name:        form.name.trim(),
         price:       form.price === "" ? 0 : parseFloat(form.price),
@@ -228,9 +304,7 @@ export default function ProductForm({ product }: ProductFormProps) {
         is_available: form.is_available,
         sort_order:  parseInt(form.sort_order, 10) || 0,
         image_url:   form.image_url ?? null,
-        options:     form.options
-          .filter((opt) => opt.name.trim().length > 0 && opt.values.length > 0)
-          .map(({ name, hasCustomPrice, values }) => ({ name, hasCustomPrice, values })),
+        options:     optionsPayload,
       };
 
       const url    = isEdit ? `/api/products?id=${product!.id}` : "/api/products";
@@ -307,14 +381,144 @@ export default function ProductForm({ product }: ProductFormProps) {
         </div>
       )}
 
-      {/* ── Image ── */}
-      <div className="card" style={{ padding: "1rem" }}>
-        <ImageUpload
-          currentImageUrl={form.image_url}
-          onUploadComplete={setImageUrl}
-          onClear={clearImage}
-          disabled={saving}
-        />
+      {/* ── Multi-Image Gallery ── */}
+      <div className="card" style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div>
+          <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--color-text)" }}>صور المنتج</h3>
+          <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
+            يمكنك رفع حتى 5 صور للمنتج. الصورة الأولى (النجمة الخضراء) هي الصورة الرئيسية التي تظهر في المتجر.
+          </p>
+        </div>
+
+        {/* Existing Images Grid */}
+        {form.images.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
+              gap: "0.75rem",
+              marginBottom: "0.5rem",
+            }}
+          >
+            {form.images.map((img, idx) => {
+              const isCover = form.image_url === img;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    position: "relative",
+                    aspectRatio: "1/1",
+                    borderRadius: "var(--radius-md)",
+                    overflow: "hidden",
+                    border: isCover ? "2px solid var(--color-success)" : "1px solid var(--color-border)",
+                    boxShadow: isCover ? "0 0 8px var(--color-success-muted)" : "none",
+                  }}
+                >
+                  {/* Image preview */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img}
+                    alt={`Product Image ${idx + 1}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+
+                  {/* Badges and controls */}
+                  {isCover && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "4px",
+                        right: "4px",
+                        background: "var(--color-success)",
+                        color: "#fff",
+                        fontSize: "0.6rem",
+                        padding: "2px 4px",
+                        borderRadius: "var(--radius-sm)",
+                        fontWeight: 800,
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                      }}
+                    >
+                      ★ رئيسية
+                    </span>
+                  )}
+
+                  {/* Actions overlay */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: "rgba(0, 0, 0, 0.6)",
+                      display: "flex",
+                      justifyContent: "space-around",
+                      alignItems: "center",
+                      padding: "4px 0",
+                    }}
+                  >
+                    {/* Move up / left */}
+                    {idx > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => moveImageUrl(idx, "up")}
+                        style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: "0.75rem" }}
+                        title="نقل لليسار"
+                      >
+                        ◀
+                      </button>
+                    )}
+
+                    {/* Delete image */}
+                    <button
+                      type="button"
+                      onClick={() => removeImageUrl(idx)}
+                      style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
+                      title="حذف"
+                    >
+                      ✕
+                    </button>
+
+                    {/* Move down / right */}
+                    {idx < form.images.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={() => moveImageUrl(idx, "down")}
+                        style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: "0.75rem" }}
+                        title="نقل لليمين"
+                      >
+                        ▶
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Upload Zone */}
+        {form.images.length < 5 ? (
+          <ImageUpload
+            currentImageUrl={null}
+            onUploadComplete={addImageUrl}
+            disabled={saving}
+            label={form.images.length === 0 ? "اسحب وارفع صورة المنتج الرئيسية" : "ارفع صورة إضافية للمنتج"}
+          />
+        ) : (
+          <div
+            style={{
+              padding: "0.75rem",
+              background: "var(--color-surface-2)",
+              borderRadius: "var(--radius-md)",
+              fontSize: "0.8125rem",
+              color: "var(--color-text-muted)",
+              textAlign: "center",
+              border: "1px dashed var(--color-border)",
+            }}
+          >
+            💡 وصلت للحد الأقصى المسموح به (5 صور). قم بحذف صورة لإضافة أخرى.
+          </div>
+        )}
       </div>
 
       {/* ── Core fields ── */}
@@ -355,6 +559,45 @@ export default function ProductForm({ product }: ProductFormProps) {
           {nameNearLimit && !errors.name && (
             <p style={{ color: "var(--color-warning)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
               ⚠ الأسماء الطويلة قد تُقطع في رسالة واتساب
+            </p>
+          )}
+        </div>
+
+        {/* Product description */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+            <label htmlFor="product-description" style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)" }}>
+              وصف المنتج
+            </label>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                color:    form.description.length > 900 ? "var(--color-warning)" : "var(--color-text-faint)",
+                fontWeight: form.description.length > 900 ? 700 : 400,
+              }}
+            >
+              {form.description.length} / 1000
+            </span>
+          </div>
+          <textarea
+            id="product-description"
+            className={`input-base${errors.description ? " input-error" : ""}`}
+            placeholder="مثال: مصنوع من مكونات طبيعية 100%، يمنحك رائحة عطرة تدوم طويلاً ومناسب لجميع المناسبات الخاصة والاستخدام اليومي."
+            value={form.description}
+            onChange={set("description")}
+            maxLength={1000}
+            disabled={saving}
+            rows={4}
+            style={{
+              lineHeight: 1.5,
+              padding: "0.75rem",
+              resize: "vertical",
+              fontSize: "0.9375rem"
+            }}
+          />
+          {errors.description && (
+            <p style={{ color: "var(--color-danger)", fontSize: "0.8125rem", marginTop: "0.25rem" }}>
+              {errors.description}
             </p>
           )}
         </div>

@@ -21,6 +21,7 @@ import { getCurrencySymbol } from "@/lib/constants";
 import { useTheme } from "@/hooks/useTheme";
 import type { CategoryRow, ProductRow, StoreRow } from "@/types/database";
 import { locales } from "@/lib/locales";
+import { parseProductOptions } from "@/lib/validations";
 
 // ---------------------------------------------------------------------------
 // Types & Interfaces
@@ -159,7 +160,7 @@ function ProductCard({
           {t.piece}
         </span>
         {(() => {
-          const opts = (product.options as any[]) ?? [];
+          const { variants: opts } = parseProductOptions(product.options);
           const hasCustomOptionPrices = opts.some((opt) => opt.hasCustomPrice && opt.values?.length > 0);
           
           if (hasCustomOptionPrices) {
@@ -388,7 +389,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   // Cumulative Price calculation helper
   const getCumulativePrice = (product: any, selections: Record<string, string>) => {
     let totalPrice = product.price;
-    const opts = (product.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(product.options);
     opts.forEach((opt) => {
       const selectedVal = selections[opt.name];
       if (selectedVal && opt.hasCustomPrice) {
@@ -448,7 +449,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
         // Extract all options names and values to translate
         const optionTexts: string[] = [];
         products.forEach((p) => {
-          const opts = (p.options as any[]) ?? [];
+          const { variants: opts } = parseProductOptions(p.options);
           opts.forEach((opt) => {
             if (opt.name) optionTexts.push(opt.name);
             if (opt.values) {
@@ -558,7 +559,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     setActiveImageIdx(0);
     
     // Auto-select the first value of each option group if present
-    const opts = (product.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(product.options);
     const initialSelections: Record<string, string> = {};
     opts.forEach((opt) => {
       if (opt.values && opt.values.length > 0) {
@@ -569,7 +570,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   };
 
   const handleAdd = (product: StoreViewProps["products"][number], translatedName?: string) => {
-    const opts = (product.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(product.options);
     if (opts.length > 0) {
       handleCardClick(product);
     } else {
@@ -583,7 +584,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   };
 
   const handleIncrement = (product: StoreViewProps["products"][number]) => {
-    const opts = (product.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(product.options);
     if (opts.length > 0) {
       // Re-open selection modal to add another variant combination
       handleCardClick(product);
@@ -593,7 +594,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   };
 
   const handleDecrement = (product: StoreViewProps["products"][number]) => {
-    const opts = (product.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(product.options);
     if (opts.length > 0) {
       // Find the last added cart item for this product and decrement it
       const matchingItems = cart.items.filter((i) => i.productId === product.id);
@@ -610,7 +611,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     if (!selectedProductForOptions) return;
     
     const p = selectedProductForOptions;
-    const opts = (p.options as any[]) ?? [];
+    const { variants: opts } = parseProductOptions(p.options);
     
     // Prepare selectedOptions array for the CartItem (stores original Arabic keys/values)
     const selectedOptionsArray = opts.map((opt) => {
@@ -619,7 +620,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       return {
         name: opt.name,
         value: valName,
-        price: opt.hasCustomPrice && matchVal ? matchVal.price : null,
+        price: opt.hasCustomPrice && matchVal && matchVal.price != null ? matchVal.price : null,
       };
     });
 
@@ -1208,7 +1209,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       {/* ──────────────────────────────────────────────────────────────────── */}
       {selectedProductForOptions && (() => {
         const p = selectedProductForOptions;
-        const opts = (p.options as any[]) ?? [];
+        const { variants: opts, description: customDescription, images: customImages } = parseProductOptions(p.options);
         const cumulativePrice = getCumulativePrice(p, selectedOptions);
         const translatedProductName = lang === "ar" ? p.name : (translatedProducts[lang]?.[p.id] ?? p.name);
 
@@ -1231,14 +1232,13 @@ export default function StoreView({ store, categories, products }: StoreViewProp
           ]
         };
 
-        const rawOptions = p.options as any;
         const productImages: string[] = (p as any).images 
-          || (Array.isArray(rawOptions?.images) ? rawOptions.images : null)
+          || (customImages && customImages.length > 0 ? customImages : null)
           || demoImages[p.name]
           || (p.image_url ? [p.image_url] : []);
 
         const productDescription: string = (p as any).description 
-          || (typeof rawOptions?.description === "string" ? rawOptions.description : null)
+          || customDescription
           || (lang === "ar" 
               ? "منتج مميز ومصنوع بجودة عالية لضمان أفضل تجربة استخدام. مثالي للاستخدام اليومي ومطابق تماماً للمواصفات المعتمدة والضوابط الفنية المتبعة لراحة عائلتك وجمال منزلك." 
               : lang === "tr" 
