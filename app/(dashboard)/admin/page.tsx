@@ -28,6 +28,15 @@ export default function AdminDashboard() {
   const [totalViews, setTotalViews] = useState<number>(0);
   const [totalClicks, setTotalClicks] = useState<number>(0);
 
+  // Funnel Analytics statistics
+  const [funnelStats, setFunnelStats] = useState({
+    register_viewed: 0,
+    step1_started: 0,
+    step1_completed: 0,
+    step2_started: 0,
+    register_success: 0
+  });
+
   // Fetch all stores and KPIs
   const fetchData = async () => {
     try {
@@ -39,6 +48,9 @@ export default function AdminDashboard() {
       setStores(data.data.stores || []);
       setTotalViews(data.data.totalViews ?? 0);
       setTotalClicks(data.data.totalClicks ?? 0);
+      if (data.data.funnelStats) {
+        setFunnelStats(data.data.funnelStats);
+      }
     } catch (e: any) {
       setError(e.message || "فشل تحميل لوحة تحكم المسؤول");
     } finally {
@@ -180,6 +192,165 @@ export default function AdminDashboard() {
           </span>
         </div>
       </div>
+
+      {/* Registration Funnel Analytics Section */}
+      {(() => {
+        const fViews = funnelStats.register_viewed;
+        const fStep1Start = funnelStats.step1_started;
+        const fStep1End = funnelStats.step1_completed;
+        const fStep2Start = funnelStats.step2_started;
+        const fSuccess = funnelStats.register_success;
+
+        const getPct = (val: number) => {
+          if (fViews === 0) return 0;
+          return Math.round((val / fViews) * 100);
+        };
+
+        const getConvFromPrev = (current: number, prev: number) => {
+          if (prev === 0) return 100;
+          return Math.round((current / prev) * 100);
+        };
+
+        return (
+          <div
+            style={{
+              background: "var(--color-surface)",
+              border: "1.5px solid var(--color-border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "1.5rem",
+              marginTop: "2.5rem",
+            }}
+          >
+            <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--color-text)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                📊 قمع التسجيل ونسب تحويل التجار الجدد
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "0.25rem" }}>
+                تتبع سلوك الزوار خطوة بخطوة وتحديد أماكن خروج المستخدمين قبل إنهاء التسجيل
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              {[
+                {
+                  title: "1. زيارة صفحة التسجيل (Viewed Page)",
+                  count: fViews,
+                  overallPct: 100,
+                  prevPct: 100,
+                  emoji: "👁️",
+                  desc: "المستخدمون الذين زاروا صفحة التسجيل لأول مرة"
+                },
+                {
+                  title: "2. البدء بإدخال بيانات الحساب (Started Step 1)",
+                  count: fStep1Start,
+                  overallPct: getPct(fStep1Start),
+                  prevPct: getConvFromPrev(fStep1Start, fViews),
+                  emoji: "✍️",
+                  desc: "بدء كتابة رقم الواتساب أو كلمة المرور"
+                },
+                {
+                  title: "3. إكمال الخطوة الأولى (Step 1 Completed)",
+                  count: fStep1End,
+                  overallPct: getPct(fStep1End),
+                  prevPct: getConvFromPrev(fStep1End, fStep1Start),
+                  emoji: "✅",
+                  desc: "إدخال بيانات صحيحة والضغط على زر الانتقال"
+                },
+                {
+                  title: "4. البدء بتفاصيل المتجر والرابط (Started Step 2)",
+                  count: fStep2Start,
+                  overallPct: getPct(fStep2Start),
+                  prevPct: getConvFromPrev(fStep2Start, fStep1End),
+                  emoji: "🏪",
+                  desc: "بدء كتابة الاسم الكامل، اسم المتجر، البريد أو الرابط"
+                },
+                {
+                  title: "5. إنشاء المتجر بنجاح (Registration Success 🎉)",
+                  count: fSuccess,
+                  overallPct: getPct(fSuccess),
+                  prevPct: getConvFromPrev(fSuccess, fStep2Start),
+                  emoji: "🚀",
+                  desc: "إعداد المتجر بالكامل والتحويل للوحة التحكم الرئيسية"
+                }
+              ].map((item, idx) => {
+                const isFirst = idx === 0;
+                const dropOff = isFirst ? 0 : 100 - item.prevPct;
+
+                return (
+                  <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    
+                    {/* Header detail */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <div>
+                        <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--color-text)" }}>
+                          {item.emoji} {item.title}
+                        </span>
+                        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
+                          {item.desc}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.8125rem" }}>
+                        <span style={{ fontWeight: 800, color: "var(--color-text)" }}>
+                          {item.count} {item.count === 1 ? "جلسة" : "جلسات"}
+                        </span>
+                        <span style={{ color: "#10B981", fontWeight: 800, background: "var(--color-success-muted)", padding: "0.125rem 0.375rem", borderRadius: "var(--radius-sm)" }}>
+                          {item.overallPct}% من الإجمالي
+                        </span>
+                        {!isFirst && (
+                          <span style={{ color: dropOff > 30 ? "var(--color-danger)" : "var(--color-warning)", fontWeight: 700 }}>
+                            🚪 انسحاب: {dropOff}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ width: "100%", height: "10px", background: "var(--color-surface-3)", borderRadius: "var(--radius-full)", overflow: "hidden", position: "relative" }}>
+                      <div
+                        style={{
+                          width: `${item.overallPct}%`,
+                          height: "100%",
+                          background: isFirst ? "#3b82f6" : item.overallPct > 40 ? "#10B981" : "var(--color-warning)",
+                          borderRadius: "var(--radius-full)",
+                          transition: "width 0.6s ease-out",
+                          boxShadow: item.overallPct > 0 ? "0 0 6px rgba(16, 185, 129, 0.2)" : "none",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Bottom overview KPI */}
+              <div
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "1rem",
+                  background: "var(--color-surface-2)",
+                  border: "1px dashed var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.75rem"
+                }}
+              >
+                <span style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", fontWeight: 700 }}>
+                  💡 معدل التحويل الكلي للمنصة (Conversion Rate):
+                </span>
+                <span style={{ fontSize: "1.125rem", fontWeight: 900, color: fSuccess > 0 ? "#10B981" : "var(--color-text)" }}>
+                  {getPct(fSuccess)}% 
+                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--color-text-muted)", marginRight: "0.375rem" }}>
+                    (من الزوار إلى تجار مسجلين)
+                  </span>
+                </span>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Section 2: Merchants List Database Table */}
       <div

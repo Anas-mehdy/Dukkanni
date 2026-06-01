@@ -79,6 +79,41 @@ export async function GET() {
 
     if (clicksError) throw clicksError;
 
+    // 4. Fetch platform registration funnel metrics
+    let funnelStats = {
+      register_viewed: 0,
+      step1_started: 0,
+      step1_completed: 0,
+      step2_started: 0,
+      register_success: 0
+    };
+
+    try {
+      const [
+        rViewed,
+        rStep1Start,
+        rStep1End,
+        rStep2Start,
+        rSuccess
+      ] = await Promise.all([
+        adminDb.rpc("get_unique_funnel_count", { target_event: "register_viewed" }),
+        adminDb.rpc("get_unique_funnel_count", { target_event: "step1_started" }),
+        adminDb.rpc("get_unique_funnel_count", { target_event: "step1_completed" }),
+        adminDb.rpc("get_unique_funnel_count", { target_event: "step2_started" }),
+        adminDb.rpc("get_unique_funnel_count", { target_event: "register_success" })
+      ]);
+
+      funnelStats = {
+        register_viewed: Number(rViewed.data ?? 0),
+        step1_started: Number(rStep1Start.data ?? 0),
+        step1_completed: Number(rStep1End.data ?? 0),
+        step2_started: Number(rStep2Start.data ?? 0),
+        register_success: Number(rSuccess.data ?? 0)
+      };
+    } catch (e) {
+      console.error("Funnel aggregation RPC error, falling back:", e);
+    }
+
     const enrichedStores = (stores || []).map((s: any) => {
       return {
         ...s,
@@ -91,7 +126,8 @@ export async function GET() {
     return ok({ 
       stores: enrichedStores,
       totalViews: totalViews ?? 0,
-      totalClicks: totalClicks ?? 0
+      totalClicks: totalClicks ?? 0,
+      funnelStats
     });
   } catch (e: any) {
     console.error("[GET /api/admin/subscriptions]", e);

@@ -202,6 +202,68 @@ export default function RegisterPage() {
   const [hasEditedSlug,   setHasEditedSlug]   = useState(false);
   const slugDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // Analytics flags
+  const [hasLoggedStep1Start, setHasLoggedStep1Start] = useState(false);
+  const [hasLoggedStep2Start, setHasLoggedStep2Start] = useState(false);
+
+  // ── Session & Page View Analytics ──────────────────────────────────────────
+  useEffect(() => {
+    let sessId = sessionStorage.getItem("dukkanni_register_session");
+    if (!sessId) {
+      sessId = typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      sessionStorage.setItem("dukkanni_register_session", sessId);
+    }
+    
+    // Log registration view event
+    fetch("/api/admin/funnel-track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: sessId, eventName: "register_viewed" }),
+    }).catch(() => {});
+  }, []);
+
+  const triggerStep1Start = () => {
+    if (!hasLoggedStep1Start) {
+      setHasLoggedStep1Start(true);
+      const sessId = sessionStorage.getItem("dukkanni_register_session");
+      if (sessId) {
+        fetch("/api/admin/funnel-track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessId, eventName: "step1_started" }),
+        }).catch(() => {});
+      }
+    }
+  };
+
+  const triggerStep2Start = () => {
+    if (!hasLoggedStep2Start) {
+      setHasLoggedStep2Start(true);
+      const sessId = sessionStorage.getItem("dukkanni_register_session");
+      if (sessId) {
+        fetch("/api/admin/funnel-track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessId, eventName: "step2_started" }),
+        }).catch(() => {});
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (whatsapp.length > 0 || password.length > 0) {
+      triggerStep1Start();
+    }
+  }, [whatsapp, password]);
+
+  useEffect(() => {
+    if (step === 2 && (fullName.length > 0 || storeName.length > 0 || slug.length > 0 || email.length > 0)) {
+      triggerStep2Start();
+    }
+  }, [step, fullName, storeName, slug, email]);
+
   const pwStrength = getPasswordStrength(password);
 
   // Real-time valid check flags
@@ -289,6 +351,16 @@ export default function RegisterPage() {
       });
       setErrors(fieldErrors);
       return;
+    }
+
+    // Log step 1 completion
+    const sessId = sessionStorage.getItem("dukkanni_register_session");
+    if (sessId) {
+      fetch("/api/admin/funnel-track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessId, eventName: "step1_completed" }),
+      }).catch(() => {});
     }
 
     setStep(2);
@@ -381,6 +453,17 @@ export default function RegisterPage() {
         setSubmitting(false);
         setApiError(setupJson.error ?? "خطأ في إنشاء المتجر. حاول مجدداً");
         return;
+      }
+
+      // Log success registration event
+      const sessId = sessionStorage.getItem("dukkanni_register_session");
+      if (sessId) {
+        fetch("/api/admin/funnel-track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessId, eventName: "register_success" }),
+        }).catch(() => {});
+        sessionStorage.removeItem("dukkanni_register_session");
       }
     } catch (err) {
       setSubmitting(false);
