@@ -13,12 +13,28 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
 import { sanitizePhone } from "@/lib/whatsapp";
+
+// ---------------------------------------------------------------------------
+// Helpers & Constants
+// ---------------------------------------------------------------------------
+
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
+function suggestSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")           // spaces/underscores → hyphens
+    .replace(/[^a-z0-9-]/g, "")       // remove everything else
+    .replace(/^-+|-+$/g, "")          // trim leading/trailing hyphens
+    .replace(/-{2,}/g, "-")           // collapse consecutive hyphens
+    .slice(0, 48);
+}
 
 // ---------------------------------------------------------------------------
 // Scoped Validation Schemas
@@ -61,6 +77,14 @@ const registerSchema = z
       .min(2, "اسم المتجر مطلوب (حرفان على الأقل)")
       .max(80, "اسم المتجر طويل جداً"),
 
+    slug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .min(4, "الرابط قصير جداً (4 أحرف على الأقل)")
+      .max(48, "الرابط طويل جداً")
+      .regex(SLUG_REGEX, "الرابط يجب أن يحتوي أحرف إنجليزية صغيرة وأرقام وشرطات (-) فقط"),
+
     whatsapp: z
       .string()
       .trim()
@@ -91,6 +115,7 @@ const registerSchema = z
 type RegisterForm = {
   fullName:        string;
   storeName:       string;
+  slug:            string;
   whatsapp:        string;
   email:           string;
   password:        string;
@@ -159,6 +184,7 @@ export default function RegisterPage() {
   const [step,            setStep]            = useState(1);
   const [fullName,        setFullName]        = useState("");
   const [storeName,       setStoreName]       = useState("");
+  const [slug,            setSlug]            = useState("");
   const [whatsapp,        setWhatsapp]        = useState("");
   const [email,           setEmail]           = useState("");
   const [password,        setPassword]        = useState("");
@@ -169,6 +195,13 @@ export default function RegisterPage() {
   const [apiError,        setApiError]        = useState("");
   const [submitting,      setSubmitting]      = useState(false);
 
+  // Slug availability state
+  const [slugChecking,    setSlugChecking]    = useState(false);
+  const [slugAvailable,   setSlugAvailable]   = useState<boolean | null>(null);
+  const [slugReason,      setSlugReason]      = useState("");
+  const [hasEditedSlug,   setHasEditedSlug]   = useState(false);
+  const slugDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   const pwStrength = getPasswordStrength(password);
 
   // Real-time valid check flags
@@ -177,7 +210,65 @@ export default function RegisterPage() {
   const isConfirmPasswordValid = confirmPassword.length >= 8 && confirmPassword === password;
   const isFullNameValid = fullName.trim().length >= 2;
   const isStoreNameValid = storeName.trim().length >= 2;
+  const isSlugValid = slug.length >= 4 && SLUG_REGEX.test(slug) && slugAvailable === true;
   const isEmailValid = email.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const getDomainSuffix = () => {
+    if (typeof window === "undefined") return ".dukkanni.com";
+    const host = window.location.host;
+    if (host.includes("localhost")) {
+      return ".localhost:3000";
+    }
+    return ".dukkanni.com";
+  };
+
+  const checkSlug = useCallback((value: string) => {
+    if (value.length < 4 || !SLUG_REGEX.test(value)) {
+      setSlugAvailable(null);
+      setSlugReason("");
+      return;
+    }
+    setSlugChecking(true);
+    fetch(`/api/store/slug-check?slug=${encodeURIComponent(value)}`)
+      .then((r) => r.json())
+      .then((j: { available: boolean; reason?: string }) => {
+        setSlugChecking(false);
+        setSlugAvailable(j.available);
+        setSlugReason(j.reason ?? "");
+      })
+      .catch(() => {
+        setSlugChecking(false);
+        setSlugAvailable(null);
+      });
+  }, []);
+
+  const handleSlugChange = (raw: string) => {
+    const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setSlug(cleaned);
+    setHasEditedSlug(true);
+    setErrors((p) => ({ ...p, slug: undefined }));
+    setApiError("");
+    setSlugAvailable(null);
+    clearTimeout(slugDebounce.current);
+    slugDebounce.current = setTimeout(() => checkSlug(cleaned), 600);
+  };
+
+  const handleStoreNameChange = (val: string) => {
+    setStoreName(val);
+    setErrors((p) => ({ ...p, storeName: undefined }));
+    setApiError("");
+    
+    if (!hasEditedSlug) {
+      const suggested = suggestSlug(val);
+      setSlug(suggested);
+      clearTimeout(slugDebounce.current);
+      if (suggested.length >= 4) {
+        slugDebounce.current = setTimeout(() => checkSlug(suggested), 600);
+      } else {
+        setSlugAvailable(null);
+      }
+    }
+  };
 
   const handleStep1Next = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -208,9 +299,20 @@ export default function RegisterPage() {
     setApiError("");
     setErrors({});
 
+    // Validate slug availability at submit time
+    if (!slug) {
+      setErrors((p) => ({ ...p, slug: "الرابط مطلوب" }));
+      return;
+    }
+    if (slugAvailable === false) {
+      setErrors((p) => ({ ...p, slug: slugReason || "رابط المتجر غير متاح" }));
+      return;
+    }
+
     const parsed = registerSchema.safeParse({
       fullName,
       storeName,
+      slug,
       whatsapp,
       email,
       password,
@@ -237,6 +339,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     const sanitizedWhatsapp = sanitizePhone(whatsapp);
 
+    // 1. Sign up user
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email:    parsed.data.email,
       password: parsed.data.password,
@@ -258,6 +361,30 @@ export default function RegisterPage() {
       } else {
         setApiError(signUpError.message);
       }
+      return;
+    }
+
+    // 2. Set up store immediately in background
+    try {
+      const setupRes = await fetch("/api/store/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: storeName.trim(),
+          slug: slug.trim(),
+          whatsapp: sanitizedWhatsapp || whatsapp.trim(),
+        }),
+      });
+
+      const setupJson = await setupRes.json();
+      if (!setupRes.ok) {
+        setSubmitting(false);
+        setApiError(setupJson.error ?? "خطأ في إنشاء المتجر. حاول مجدداً");
+        return;
+      }
+    } catch (err) {
+      setSubmitting(false);
+      setApiError("فشل الاتصال بالخادم أثناء إعداد المتجر. يرجى المحاولة مرة أخرى");
       return;
     }
 
@@ -607,7 +734,7 @@ export default function RegisterPage() {
                   type="text"
                   className={`input-base${errors.storeName ? " input-error" : isStoreNameValid ? " input-success" : ""}`}
                   value={storeName}
-                  onChange={(e) => { setStoreName(e.target.value); setErrors((p) => ({ ...p, storeName: undefined })); setApiError(""); }}
+                  onChange={(e) => handleStoreNameChange(e.target.value)}
                   placeholder="مثال: دكان الياسمين"
                   disabled={submitting}
                   style={{ paddingLeft: isStoreNameValid ? "2.5rem" : "0.75rem" }}
@@ -619,6 +746,75 @@ export default function RegisterPage() {
                 )}
               </div>
               {errors.storeName && <p style={errorStyle}>{errors.storeName}</p>}
+            </div>
+
+            {/* Store Link (Slug) */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+                <label htmlFor="reg-slug" style={labelStyle}>
+                  رابط المتجر <span style={{ color: "var(--color-danger)" }}>*</span>
+                </label>
+                {slugChecking && (
+                  <span style={{ fontSize: "0.75rem", color: "var(--color-text-faint)", fontWeight: 600 }}>⏳ جاري التحقق...</span>
+                )}
+                {!slugChecking && slugAvailable === true && (
+                  <span style={{ fontSize: "0.75rem", color: "#10B981", fontWeight: 700 }}>✓ متاح</span>
+                )}
+                {!slugChecking && slugAvailable === false && (
+                  <span style={{ fontSize: "0.75rem", color: "var(--color-danger)", fontWeight: 700 }}>✗ غير متاح</span>
+                )}
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  id="reg-slug"
+                  type="text"
+                  className={`input-base${errors.slug || slugAvailable === false ? " input-error" : isSlugValid ? " input-success" : ""}`}
+                  value={slug}
+                  onChange={(e) => handleSlugChange(e.target.value)}
+                  placeholder="my-store"
+                  disabled={submitting}
+                  dir="ltr"
+                  style={{ 
+                    paddingLeft: isSlugValid ? "2.5rem" : "0.75rem",
+                    textAlign: "left"
+                  }}
+                />
+                {isSlugValid && (
+                  <div style={{ position: "absolute", top: "50%", left: "0.75rem", transform: "translateY(-50%)", display: "flex", alignItems: "center" }}>
+                    <CheckmarkIcon />
+                  </div>
+                )}
+              </div>
+              
+              {/* Dynamic Domain Preview Pill */}
+              <div
+                style={{
+                  display:      "flex",
+                  alignItems:   "center",
+                  gap:          "0.375rem",
+                  marginTop:    "0.5rem",
+                  padding:      "0.5rem 0.75rem",
+                  background:   "var(--color-surface-2)",
+                  borderRadius: "var(--radius-md)",
+                  border:       "1px solid var(--color-border)",
+                  fontSize:     "0.8125rem",
+                  direction:    "ltr",
+                  textAlign:    "left",
+                }}
+              >
+                <span style={{ color: "#10B981" }}>🌐</span>
+                <span style={{ color: slug ? "var(--color-text)" : "var(--color-text-faint)", fontWeight: slug ? 700 : 400 }}>
+                  {slug || "your-slug"}
+                </span>
+                <span style={{ color: "var(--color-text-faint)" }}>
+                  {getDomainSuffix()}
+                </span>
+              </div>
+              
+              {errors.slug && <p style={errorStyle}>{errors.slug}</p>}
+              {!errors.slug && slugAvailable === false && slugReason && (
+                <p style={errorStyle}>{slugReason}</p>
+              )}
             </div>
 
             {/* Email */}
