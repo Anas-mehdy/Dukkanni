@@ -202,66 +202,67 @@ export default function RegisterPage() {
   const [hasEditedSlug,   setHasEditedSlug]   = useState(false);
   const slugDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Analytics flags
-  const [hasLoggedStep1Start, setHasLoggedStep1Start] = useState(false);
-  const [hasLoggedStep2Start, setHasLoggedStep2Start] = useState(false);
+  // Analytics flags — use refs to avoid stale closure bugs in useEffect deps
+  const hasLoggedStep1Start = useRef(false);
+  const hasLoggedStep2Start = useRef(false);
 
   // ── Session & Page View Analytics ──────────────────────────────────────────
-  useEffect(() => {
+  const getOrCreateSessionId = (): string => {
     let sessId = sessionStorage.getItem("dukkanni_register_session");
     if (!sessId) {
-      sessId = typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      // Always generate a proper UUID v4
+      if (typeof crypto.randomUUID === "function") {
+        sessId = crypto.randomUUID();
+      } else {
+        // Proper UUID v4 fallback
+        sessId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      }
       sessionStorage.setItem("dukkanni_register_session", sessId);
     }
-    
-    // Log registration view event
-    fetch("/api/admin/funnel-track", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: sessId, eventName: "register_viewed" }),
-    }).catch(() => {});
+    return sessId;
+  };
+
+  const logFunnelEvent = (eventName: string) => {
+    try {
+      const sessId = getOrCreateSessionId();
+      fetch("/api/admin/funnel-track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessId, eventName }),
+      }).catch(() => {});
+    } catch {}
+  };
+
+  // Log page view on mount
+  useEffect(() => {
+    logFunnelEvent("register_viewed");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const triggerStep1Start = () => {
-    if (!hasLoggedStep1Start) {
-      setHasLoggedStep1Start(true);
-      const sessId = sessionStorage.getItem("dukkanni_register_session");
-      if (sessId) {
-        fetch("/api/admin/funnel-track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sessId, eventName: "step1_started" }),
-        }).catch(() => {});
-      }
-    }
-  };
-
-  const triggerStep2Start = () => {
-    if (!hasLoggedStep2Start) {
-      setHasLoggedStep2Start(true);
-      const sessId = sessionStorage.getItem("dukkanni_register_session");
-      if (sessId) {
-        fetch("/api/admin/funnel-track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sessId, eventName: "step2_started" }),
-        }).catch(() => {});
-      }
-    }
-  };
-
+  // Log step1_started when user first types in step 1
   useEffect(() => {
-    if (whatsapp.length > 0 || password.length > 0) {
-      triggerStep1Start();
+    if ((whatsapp.length > 0 || password.length > 0) && !hasLoggedStep1Start.current) {
+      hasLoggedStep1Start.current = true;
+      logFunnelEvent("step1_started");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatsapp, password]);
 
+  // Log step2_started when user first types in step 2
   useEffect(() => {
-    if (step === 2 && (fullName.length > 0 || storeName.length > 0 || slug.length > 0 || email.length > 0)) {
-      triggerStep2Start();
+    if (
+      step === 2 &&
+      (fullName.length > 0 || storeName.length > 0 || slug.length > 0 || email.length > 0) &&
+      !hasLoggedStep2Start.current
+    ) {
+      hasLoggedStep2Start.current = true;
+      logFunnelEvent("step2_started");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, fullName, storeName, slug, email]);
 
   const pwStrength = getPasswordStrength(password);
@@ -354,14 +355,7 @@ export default function RegisterPage() {
     }
 
     // Log step 1 completion
-    const sessId = sessionStorage.getItem("dukkanni_register_session");
-    if (sessId) {
-      fetch("/api/admin/funnel-track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: sessId, eventName: "step1_completed" }),
-      }).catch(() => {});
-    }
+    logFunnelEvent("step1_completed");
 
     setStep(2);
   };
@@ -456,15 +450,8 @@ export default function RegisterPage() {
       }
 
       // Log success registration event
-      const sessId = sessionStorage.getItem("dukkanni_register_session");
-      if (sessId) {
-        fetch("/api/admin/funnel-track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sessId, eventName: "register_success" }),
-        }).catch(() => {});
-        sessionStorage.removeItem("dukkanni_register_session");
-      }
+      logFunnelEvent("register_success");
+      sessionStorage.removeItem("dukkanni_register_session");
     } catch (err) {
       setSubmitting(false);
       setApiError("فشل الاتصال بالخادم أثناء إعداد المتجر. يرجى المحاولة مرة أخرى");
