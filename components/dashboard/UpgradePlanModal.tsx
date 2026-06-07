@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 interface UpgradePlanModalProps {
   isOpen: boolean;
@@ -17,7 +17,18 @@ export default function UpgradePlanModal({
   limitValue,
   currentValue,
 }: UpgradePlanModalProps) {
-  const router = useRouter();
+  const [storeInfo, setStoreInfo] = useState<{ name: string; slug: string } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch("/api/store")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.data) setStoreInfo(res.data);
+      })
+      .catch(() => {});
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const typeLabelsAr: Record<string, string> = {
@@ -141,7 +152,8 @@ export default function UpgradePlanModal({
           <button
             onClick={() => {
               onClose();
-              router.push("/pricing");
+              const text = `مرحباً، أريد ترقية باقة متجري ${storeInfo?.name || ""} (${storeInfo?.slug || ""}) في منصة دكاني ⚡`;
+              window.open(`https://wa.me/905350215375?text=${encodeURIComponent(text)}`, "_blank");
             }}
             className="btn-primary"
             style={{

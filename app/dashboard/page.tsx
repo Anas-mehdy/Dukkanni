@@ -342,8 +342,12 @@ export default function DashboardPage() {
             {/* Upgrade CTA */}
             {planTier !== "pro" && (
               <div style={{ marginTop: "1.25rem", display: "flex", justifyContent: "flex-end" }}>
-                <Link
-                  href="/pricing"
+                <a
+                  href={`https://wa.me/905350215375?text=${encodeURIComponent(
+                    `مرحباً، أريد ترقية باقة متجري ${store?.name || ""} (${store?.slug || ""}) في منصة دكاني ⚡`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="btn-primary"
                   style={{
                     textDecoration: "none",
@@ -351,10 +355,13 @@ export default function DashboardPage() {
                     padding: "0.5rem 1rem",
                     minHeight: "36px",
                     fontWeight: 800,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
                   ترقية الباقة 🚀
-                </Link>
+                </a>
               </div>
             )}
           </div>

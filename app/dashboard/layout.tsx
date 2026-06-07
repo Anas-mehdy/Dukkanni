@@ -19,7 +19,6 @@ import Link from "next/link";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useTheme } from "@/hooks/useTheme";
 import type { ReactNode } from "react";
-import SubscriptionBanner from "@/components/dashboard/SubscriptionBanner";
 
 // ---------------------------------------------------------------------------
 // Store Guard — silently redirects to onboarding if merchant has no store
@@ -312,13 +311,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <ToastProvider>
       <StoreGuard>
         <TopHeader />
-        {store && (
-          <SubscriptionBanner
-            planType={store.plan_type}
-            trialEndsAt={store.trial_ends_at}
-          />
-        )}
-        <main className="dashboard-content animate-fade-in" style={{ paddingTop: store?.plan_type === "trial" ? "calc(var(--header-h) + 2.75rem)" : "calc(var(--header-h) + 1rem)" }}>
+        <main className="dashboard-content animate-fade-in" style={{ paddingTop: "calc(var(--header-h) + 1rem)" }}>
           {children}
         </main>
         <BottomNav />
