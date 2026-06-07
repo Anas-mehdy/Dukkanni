@@ -52,6 +52,7 @@ export async function GET() {
         slug,
         whatsapp_e164,
         plan_type,
+        plan_tier,
         subscription_status,
         trial_ends_at,
         subscription_ends_at,
@@ -143,43 +144,39 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { storeId, action } = body;
+    const { storeId, action, planTier } = body;
 
-    if (!storeId || !["monthly", "yearly", "suspend"].includes(action)) {
+    if (!storeId || !["monthly", "yearly", "suspend", "activate", "set_plan_tier"].includes(action)) {
       return err("معاملات غير صالحة", 400);
     }
 
-    const now = new Date();
-    let plan_type: string | undefined;
-    let subscription_status: string;
-    let subscription_ends_at: string | null = null;
+    const updatePayload: Record<string, any> = {};
 
-    if (action === "monthly") {
-      plan_type = "monthly";
-      subscription_status = "active";
+    if (action === "set_plan_tier") {
+      if (!["free", "starter", "pro"].includes(planTier)) {
+        return err("فئة الخطة غير صالحة", 400);
+      }
+      updatePayload.plan_tier = planTier;
+      // When explicitly setting a plan tier, ensure store is active and ends is set to null (indefinite admin override)
+      updatePayload.subscription_status = "active";
+      updatePayload.subscription_ends_at = null;
+    } else if (action === "monthly") {
+      updatePayload.plan_type = "monthly";
+      updatePayload.subscription_status = "active";
       const ends = new Date();
-      ends.setDate(now.getDate() + 30);
-      subscription_ends_at = ends.toISOString();
+      ends.setDate(ends.getDate() + 30);
+      updatePayload.subscription_ends_at = ends.toISOString();
     } else if (action === "yearly") {
-      plan_type = "yearly";
-      subscription_status = "active";
+      updatePayload.plan_type = "yearly";
+      updatePayload.subscription_status = "active";
       const ends = new Date();
-      ends.setDate(now.getDate() + 365);
-      subscription_ends_at = ends.toISOString();
-    } else {
-      // suspend
-      subscription_status = "suspended";
-    }
-
-    const updatePayload: Record<string, any> = {
-      subscription_status,
-    };
-
-    if (plan_type) {
-      updatePayload.plan_type = plan_type;
-    }
-    if (action !== "suspend") {
-      updatePayload.subscription_ends_at = subscription_ends_at;
+      ends.setDate(ends.getDate() + 365);
+      updatePayload.subscription_ends_at = ends.toISOString();
+    } else if (action === "suspend") {
+      updatePayload.subscription_status = "suspended";
+    } else if (action === "activate") {
+      updatePayload.subscription_status = "active";
+      updatePayload.subscription_ends_at = null;
     }
 
     // Use the privileged admin client to update the target store, bypassing RLS
@@ -188,7 +185,7 @@ export async function PATCH(request: NextRequest) {
       .from("stores")
       .update(updatePayload)
       .eq("id", storeId)
-      .select("id, name, plan_type, subscription_status")
+      .select("id, name, plan_type, plan_tier, subscription_status")
       .single();
 
     if (error) throw error;

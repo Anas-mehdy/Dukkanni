@@ -9,6 +9,7 @@ interface Store {
   slug: string;
   whatsapp_e164: string;
   plan_type: "trial" | "monthly" | "yearly";
+  plan_tier: "free" | "starter" | "pro";
   subscription_status: "active" | "expired" | "suspended";
   trial_ends_at: string;
   subscription_ends_at: string | null;
@@ -62,14 +63,19 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  const handleAction = async (storeId: string, action: "monthly" | "yearly" | "suspend") => {
+  const handleAction = async (
+    storeId: string,
+    action: "monthly" | "yearly" | "suspend" | "activate" | "set_plan_tier",
+    planTier?: "free" | "starter" | "pro"
+  ) => {
     if (submittingId) return;
-    setSubmittingId(`${storeId}-${action}`);
+    const submissionKey = planTier ? `${storeId}-${action}-${planTier}` : `${storeId}-${action}`;
+    setSubmittingId(submissionKey);
     try {
       const res = await fetch("/api/admin/subscriptions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId, action }),
+        body: JSON.stringify({ storeId, action, planTier }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -87,35 +93,31 @@ export default function AdminDashboard() {
   // KPI calculations
   const totalMerchants = stores.length;
 
-  const activeTrials = stores.filter(
-    (s) => s.plan_type === "trial" && s.subscription_status === "active"
+  const freeTierCount = stores.filter((s) => s.plan_tier === "free").length;
+  const starterTierCount = stores.filter((s) => s.plan_tier === "starter").length;
+  const proTierCount = stores.filter((s) => s.plan_tier === "pro").length;
+
+  const activeStarter = stores.filter(
+    (s) => s.plan_tier === "starter" && s.subscription_status === "active"
   ).length;
 
-  const expiredTrials = stores.filter(
-    (s) =>
-      (s.plan_type === "trial" && s.subscription_status === "expired") ||
-      (s.plan_type === "trial" && new Date() > new Date(s.trial_ends_at))
+  const activePro = stores.filter(
+    (s) => s.plan_tier === "pro" && s.subscription_status === "active"
   ).length;
 
-  const activePaidTiers = stores.filter(
-    (s) => ["monthly", "yearly"].includes(s.plan_type) && s.subscription_status === "active"
-  ).length;
-
-  const activeMonthly = stores.filter(
-    (s) => s.plan_type === "monthly" && s.subscription_status === "active"
-  ).length;
-
-  const activeYearly = stores.filter(
-    (s) => s.plan_type === "yearly" && s.subscription_status === "active"
-  ).length;
-
-  // Monthly Revenue projection: Monthly is $5, Yearly is $50/yr (~ $4.17/mo)
-  const projectedRevenue = activeMonthly * 5 + activeYearly * (50 / 12);
+  // Monthly Revenue projection based on plan tiers: Starter is $5/mo, Pro is $15/mo
+  const projectedRevenue = activeStarter * 5 + activePro * 15;
 
   const PLAN_LABELS = {
     trial: "تجريبي ⏳",
     monthly: "شهري 🟢",
     yearly: "سنوي 🔵",
+  };
+
+  const PLAN_TIER_LABELS = {
+    free: "المجانية 🆓",
+    starter: "البداية ⚡",
+    pro: "الاحترافية 🚀",
   };
 
   const STATUS_LABELS = {
@@ -210,16 +212,16 @@ export default function AdminDashboard() {
           <span style={kpiValueStyle}>{totalMerchants}</span>
         </div>
         <div style={kpiCardStyle}>
-          <span style={kpiTitleStyle}>فترات تجريبية نشطة ⏳</span>
-          <span style={kpiValueStyle}>{activeTrials}</span>
+          <span style={kpiTitleStyle}>الباقة المجانية 🆓</span>
+          <span style={kpiValueStyle}>{freeTierCount}</span>
         </div>
         <div style={kpiCardStyle}>
-          <span style={kpiTitleStyle}>فترات تجريبية منتهية 🔴</span>
-          <span style={kpiValueStyle}>{expiredTrials}</span>
+          <span style={kpiTitleStyle}>باقة البداية ($5) ⚡</span>
+          <span style={kpiValueStyle}>{starterTierCount}</span>
         </div>
         <div style={kpiCardStyle}>
-          <span style={kpiTitleStyle}>اشتراكات مدفوعة نشطة 🟢</span>
-          <span style={kpiValueStyle}>{activePaidTiers}</span>
+          <span style={kpiTitleStyle}>الباقة الاحترافية ($15) 🚀</span>
+          <span style={kpiValueStyle}>{proTierCount}</span>
         </div>
         <div style={kpiCardStyle}>
           <span style={kpiTitleStyle}>إجمالي زوار المنصة 👁️</span>
@@ -421,7 +423,8 @@ export default function AdminDashboard() {
                 <th style={thStyle}>اسم المتجر / المالك</th>
                 <th style={thStyle}>الرابط السريع</th>
                 <th style={thStyle}>التواصل والبريد</th>
-                <th style={thStyle}>نوع الباقة</th>
+                <th style={thStyle}>فئة الباقة</th>
+                <th style={thStyle}>نوع الاشتراك</th>
                 <th style={thStyle}>حالة الاشتراك</th>
                 <th style={thStyle}>تاريخ الانتهاء</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>الإجراءات الإدارية</th>
@@ -430,7 +433,7 @@ export default function AdminDashboard() {
             <tbody>
               {stores.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: "2rem", textCombineUpright: "center", color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
+                  <td colSpan={8} style={{ padding: "2rem", textCombineUpright: "center", color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
                     لا توجد متاجر مسجلة حالياً في المنصة.
                   </td>
                 </tr>
@@ -485,6 +488,31 @@ export default function AdminDashboard() {
                         <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
                           {s.whatsapp_e164}
                         </div>
+                      </td>
+                      {/* Plan Tier Column */}
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 800,
+                            padding: "0.25rem 0.5rem",
+                            borderRadius: "var(--radius-sm)",
+                            background:
+                              s.plan_tier === "free"
+                                ? "rgba(107, 114, 128, 0.1)"
+                                : s.plan_tier === "starter"
+                                ? "var(--color-primary-muted)"
+                                : "rgba(16, 185, 129, 0.1)",
+                            color:
+                              s.plan_tier === "free"
+                                ? "#6B7280"
+                                : s.plan_tier === "starter"
+                                ? "var(--color-primary)"
+                                : "#10B981",
+                          }}
+                        >
+                          {PLAN_TIER_LABELS[s.plan_tier] || s.plan_tier}
+                        </span>
                       </td>
                       <td style={tdStyle}>
                         <span
@@ -543,50 +571,98 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td style={{ ...tdStyle, paddingBlock: "0.75rem" }}>
-                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
-                          {/* Monthly Activation */}
-                          <button
-                            onClick={() => handleAction(s.id, "monthly")}
-                            disabled={!!submittingId}
-                            style={{
-                              ...actionBtnStyle,
-                              background: "var(--color-primary-muted)",
-                              color: "var(--color-primary)",
-                              border: "1px solid var(--color-primary-glow)",
-                            }}
-                          >
-                            {submittingId === `${s.id}-monthly` ? "⏳..." : "تفعيل شهري 🟢"}
-                          </button>
+                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                          
+                          {/* Plan Tier Selector */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: "120px" }}>
+                            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--color-text-muted)" }}>باقة الاشتراك:</span>
+                            <select
+                              value={s.plan_tier}
+                              onChange={(e) => handleAction(s.id, "set_plan_tier", e.target.value as any)}
+                              disabled={!!submittingId}
+                              style={{
+                                padding: "0.375rem 0.5rem",
+                                borderRadius: "var(--radius-sm)",
+                                fontSize: "0.75rem",
+                                fontWeight: 800,
+                                background: "var(--color-surface)",
+                                color: "var(--color-text)",
+                                border: "1px solid var(--color-border)",
+                                fontFamily: "var(--font-cairo), sans-serif",
+                                cursor: "pointer",
+                                outline: "none",
+                              }}
+                            >
+                              <option value="free">المجانية (Free)</option>
+                              <option value="starter">البداية (Starter)</option>
+                              <option value="pro">الاحترافية (Pro)</option>
+                            </select>
+                          </div>
 
-                          {/* Yearly Activation */}
-                          <button
-                            onClick={() => handleAction(s.id, "yearly")}
-                            disabled={!!submittingId}
-                            style={{
-                              ...actionBtnStyle,
-                              background: "rgba(59, 130, 246, 0.1)",
-                              color: "#3b82f6",
-                              border: "1px solid rgba(59, 130, 246, 0.2)",
-                            }}
-                          >
-                            {submittingId === `${s.id}-yearly` ? "⏳..." : "تفعيل سنوي 🔵"}
-                          </button>
+                          {/* Status & Subscription Control Buttons */}
+                          <div style={{ display: "flex", gap: "0.375rem", alignItems: "flex-end" }}>
+                            
+                            {/* Activate / Suspend Toggle */}
+                            {s.subscription_status === "suspended" ? (
+                              <button
+                                onClick={() => handleAction(s.id, "activate")}
+                                disabled={!!submittingId}
+                                style={{
+                                  ...actionBtnStyle,
+                                  background: "var(--color-success-muted)",
+                                  color: "var(--color-success)",
+                                  border: "1px solid var(--color-success-glow)",
+                                }}
+                              >
+                                {submittingId === `${s.id}-activate` ? "⏳..." : "تنشيط 🟢"}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAction(s.id, "suspend")}
+                                disabled={!!submittingId}
+                                style={{
+                                  ...actionBtnStyle,
+                                  background: "rgba(239, 68, 68, 0.1)",
+                                  color: "var(--color-danger)",
+                                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                                }}
+                              >
+                                {submittingId === `${s.id}-suspend` ? "⏳..." : "تعليق ⚠️"}
+                              </button>
+                            )}
 
-                          {/* Account Suspension */}
-                          <button
-                            onClick={() => handleAction(s.id, "suspend")}
-                            disabled={!!submittingId || s.subscription_status === "suspended"}
-                            style={{
-                              ...actionBtnStyle,
-                              background: "rgba(239, 68, 68, 0.1)",
-                              color: "var(--color-danger)",
-                              border: "1px solid rgba(239, 68, 68, 0.2)",
-                              opacity: s.subscription_status === "suspended" ? 0.5 : 1,
-                              cursor: s.subscription_status === "suspended" ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            {submittingId === `${s.id}-suspend` ? "⏳..." : "حظر الحساب ⚠️"}
-                          </button>
+                            {/* Monthly extension */}
+                            <button
+                              onClick={() => handleAction(s.id, "monthly")}
+                              disabled={!!submittingId}
+                              title="تفعيل وتمديد الاشتراك لـ 30 يوم"
+                              style={{
+                                ...actionBtnStyle,
+                                background: "var(--color-primary-muted)",
+                                color: "var(--color-primary)",
+                                border: "1px solid var(--color-primary-glow)",
+                              }}
+                            >
+                              {submittingId === `${s.id}-monthly` ? "⏳" : "+30 يوم 📅"}
+                            </button>
+
+                            {/* Yearly extension */}
+                            <button
+                              onClick={() => handleAction(s.id, "yearly")}
+                              disabled={!!submittingId}
+                              title="تفعيل وتمديد الاشتراك لـ سنة كاملة"
+                              style={{
+                                ...actionBtnStyle,
+                                background: "rgba(59, 130, 246, 0.1)",
+                                color: "#3b82f6",
+                                border: "1px solid rgba(59, 130, 246, 0.2)",
+                              }}
+                            >
+                              {submittingId === `${s.id}-yearly` ? "⏳" : "+سنة 🗓️"}
+                            </button>
+
+                          </div>
+
                         </div>
                       </td>
                     </tr>
