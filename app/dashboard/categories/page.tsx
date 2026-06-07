@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import type { CategoryRow } from "@/types/database";
+import UpgradePlanModal from "@/components/dashboard/UpgradePlanModal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +62,12 @@ export default function CategoriesPage() {
   const [saving, setSaving]           = useState(false);
   const [deletingId, setDeletingId]   = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [limitError, setLimitError] = useState<{
+    isOpen: boolean;
+    limitType?: string;
+    limitValue?: number;
+    currentValue?: number;
+  }>({ isOpen: false });
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchCategories = useCallback(async () => {
@@ -90,7 +97,18 @@ export default function CategoriesPage() {
         body:    JSON.stringify({ name: newName.trim(), sort_order: newOrder }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "خطأ في إضافة الفئة");
+      if (!res.ok) {
+        if (json.error === "PLAN_LIMIT_REACHED") {
+          setLimitError({
+            isOpen: true,
+            limitType: json.limitType,
+            limitValue: json.limitValue,
+            currentValue: json.currentValue,
+          });
+          return;
+        }
+        throw new Error(json.error ?? "خطأ في إضافة الفئة");
+      }
       setCategories((prev) => [...prev, json.data]);
       setNewName("");
       setNewOrder(0);
@@ -429,6 +447,14 @@ export default function CategoriesPage() {
           ))}
         </div>
       )}
+
+      <UpgradePlanModal
+        isOpen={limitError.isOpen}
+        onClose={() => setLimitError({ isOpen: false })}
+        limitType={limitError.limitType}
+        limitValue={limitError.limitValue}
+        currentValue={limitError.currentValue}
+      />
     </div>
   );
 }

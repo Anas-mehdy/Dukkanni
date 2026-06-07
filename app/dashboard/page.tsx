@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [store, setStore]   = useState<StoreSummary | null>(null);
   const [stats, setStats]   = useState<Stats | null>(null);
   const [analytics, setAnalytics] = useState<{ views: number; clicks: number } | null>(null);
+  const [planUsage, setPlanUsage] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [generatingQR, setGeneratingQR] = useState(false);
 
@@ -96,6 +97,12 @@ export default function DashboardPage() {
     fetch("/api/store/analytics")
       .then((r) => r.json())
       .then((j) => setAnalytics(j.data ?? null))
+      .catch(() => {});
+
+    // Fetch plan usage
+    fetch("/api/store/plan-usage")
+      .then((r) => r.json())
+      .then((j) => setPlanUsage(j.data ?? null))
       .catch(() => {});
   }, []);
 
@@ -237,6 +244,123 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="skeleton" style={{ height: "88px", marginBottom: "1.25rem", borderRadius: "var(--radius-lg)" }} />
+      )}
+
+      {/* Plan Usage Card */}
+      {planUsage ? (() => {
+        const { planTier, limits, usage } = planUsage;
+        
+        const productsPercent = limits.maxProducts === -1 ? 0 : Math.min(100, (usage.products / limits.maxProducts) * 100);
+        const categoriesPercent = limits.maxCategories === -1 ? 0 : Math.min(100, (usage.categories / limits.maxCategories) * 100);
+        const ordersPercent = limits.maxOrdersPerMonth === -1 ? 0 : Math.min(100, (usage.orders / limits.maxOrdersPerMonth) * 100);
+
+        const isProductsWarning = limits.maxProducts !== -1 && (usage.products / limits.maxProducts) >= 0.8;
+        const isCategoriesWarning = limits.maxCategories !== -1 && (usage.categories / limits.maxCategories) >= 0.8;
+        const isOrdersWarning = limits.maxOrdersPerMonth !== -1 && (usage.orders / limits.maxOrdersPerMonth) >= 0.8;
+
+        const isWarning = isProductsWarning || isCategoriesWarning || isOrdersWarning;
+        
+        return (
+          <div
+            className="card"
+            style={{
+              padding: "1.25rem",
+              marginBottom: "1.25rem",
+              borderColor: isWarning ? "var(--color-warning)" : "var(--color-border)",
+              boxShadow: isWarning ? "0 0 12px var(--color-warning-muted)" : "none",
+              background: isWarning ? "linear-gradient(135deg, var(--color-warning-muted), var(--color-surface))" : "var(--color-surface)",
+              transition: "all 0.2s ease-in-out",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: "var(--color-text)" }}>
+                📊 استهلاك خطة الاشتراك ({limits.nameAr})
+              </span>
+              {isWarning && (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--color-warning)",
+                    fontWeight: 800,
+                    background: "rgba(245, 158, 11, 0.1)",
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  ⚠️ قارب على النفاد
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+              {/* Products Usage */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", marginBottom: "0.25rem" }}>
+                  <span style={{ color: "var(--color-text-muted)" }}>إجمالي المنتجات المضافة</span>
+                  <strong style={{ color: isProductsWarning ? "var(--color-warning)" : "var(--color-text)" }}>
+                    {usage.products} / {limits.maxProducts === -1 ? "∞" : limits.maxProducts} (منتج مستخدم)
+                  </strong>
+                </div>
+                {limits.maxProducts !== -1 && (
+                  <div style={{ height: "6px", width: "100%", background: "var(--color-surface-3)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${productsPercent}%`, background: isProductsWarning ? "var(--color-warning)" : "var(--color-primary)", borderRadius: "3px" }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Categories Usage */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", marginBottom: "0.25rem" }}>
+                  <span style={{ color: "var(--color-text-muted)" }}>إجمالي الفئات المضافة</span>
+                  <strong style={{ color: isCategoriesWarning ? "var(--color-warning)" : "var(--color-text)" }}>
+                    {usage.categories} / {limits.maxCategories === -1 ? "∞" : limits.maxCategories} (فئة مستخدمة)
+                  </strong>
+                </div>
+                {limits.maxCategories !== -1 && (
+                  <div style={{ height: "6px", width: "100%", background: "var(--color-surface-3)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${categoriesPercent}%`, background: isCategoriesWarning ? "var(--color-warning)" : "var(--color-primary)", borderRadius: "3px" }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Orders Usage */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", marginBottom: "0.25rem" }}>
+                  <span style={{ color: "var(--color-text-muted)" }}>طلبات الشهر الحالي</span>
+                  <strong style={{ color: isOrdersWarning ? "var(--color-warning)" : "var(--color-text)" }}>
+                    {usage.orders} / {limits.maxOrdersPerMonth === -1 ? "∞" : limits.maxOrdersPerMonth} (طلب مستخدم)
+                  </strong>
+                </div>
+                {limits.maxOrdersPerMonth !== -1 && (
+                  <div style={{ height: "6px", width: "100%", background: "var(--color-surface-3)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${ordersPercent}%`, background: isOrdersWarning ? "var(--color-warning)" : "var(--color-primary)", borderRadius: "3px" }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Upgrade CTA */}
+            {planTier !== "pro" && (
+              <div style={{ marginTop: "1.25rem", display: "flex", justifyContent: "flex-end" }}>
+                <Link
+                  href="/pricing"
+                  className="btn-primary"
+                  style={{
+                    textDecoration: "none",
+                    fontSize: "0.8125rem",
+                    padding: "0.5rem 1rem",
+                    minHeight: "36px",
+                    fontWeight: 800,
+                  }}
+                >
+                  ترقية الباقة 🚀
+                </Link>
+              </div>
+            )}
+          </div>
+        );
+      })() : (
+        <div className="skeleton" style={{ height: "180px", marginBottom: "1.25rem", borderRadius: "var(--radius-lg)" }} />
       )}
 
       {/* Stats grid */}

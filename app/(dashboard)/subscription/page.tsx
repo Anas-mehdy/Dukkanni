@@ -1,41 +1,30 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { PLAN_LIMITS } from "@/lib/plans";
 
 export default async function SubscriptionPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: store } = await supabase
+  const { data: store, error } = await supabase
     .from("stores")
-    .select("name, slug, plan_type, subscription_status, trial_ends_at, subscription_ends_at")
+    .select("name, slug, plan_type, subscription_status, trial_ends_at, subscription_ends_at, plan_tier")
     .eq("owner_id", user.id)
     .single();
 
-  if (!store) redirect("/dashboard/onboarding");
+  if (error || !store) redirect("/dashboard/onboarding");
 
-  const isTrial = store.plan_type === "trial";
-  const endDate = isTrial
-    ? new Date(store.trial_ends_at)
-    : store.subscription_ends_at
-    ? new Date(store.subscription_ends_at)
-    : null;
+  const planTier = store.plan_tier || "free";
+  const currentPlan = PLAN_LIMITS[planTier as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
 
-  let daysRemaining = 0;
-  if (endDate) {
-    const diffTime = endDate.getTime() - new Date().getTime();
-    daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-  }
-
-  const intentText = isTrial ? "أريد الترقية للباقة المدفوعة" : "أريد تجديد اشتراكي الحالي";
+  // Intent text for WhatsApp upgrade
+  const intentText = planTier === "free" 
+    ? "أريد الترقية إلى باقة البداية أو الاحترافية" 
+    : `أريد تجديد/تعديل اشتراكي الحالي لباقة ${currentPlan.nameAr}`;
   const messageText = `مرحباً، أنا صاحب متجر ${store.name} (${store.slug})، ${intentText} في منصة دكاني ⚡`;
   const waUrl = `https://wa.me/905350215375?text=${encodeURIComponent(messageText)}`;
-
-  const PLAN_LABELS = {
-    trial: "الفترة التجريبية المجانية",
-    monthly: "باقة النمو السريع (الشهرية)",
-    yearly: "باقة التاجر الجاد (السنوية)",
-  };
 
   const STATUS_LABELS = {
     active: "نشط 🟢",
@@ -51,7 +40,7 @@ export default async function SubscriptionPage() {
       : "var(--color-warning)";
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "1.5rem" }}>
+    <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "1.5rem", fontFamily: "var(--font-cairo), sans-serif", direction: "rtl" }}>
       {/* Page Header */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--color-text)", marginBottom: "0.25rem" }}>
@@ -77,8 +66,8 @@ export default async function SubscriptionPage() {
           {/* Plan Name */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
             <span style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", fontWeight: 600 }}>الباقة الحالية:</span>
-            <span style={{ fontSize: "1rem", fontWeight: 800, color: isTrial ? "var(--color-warning)" : "var(--color-primary)" }}>
-              {PLAN_LABELS[store.plan_type as keyof typeof PLAN_LABELS] ?? store.plan_type}
+            <span style={{ fontSize: "1rem", fontWeight: 800, color: planTier === "free" ? "var(--color-text-muted)" : "var(--color-primary)" }}>
+              {currentPlan.nameAr} ({currentPlan.name})
             </span>
           </div>
 
@@ -90,60 +79,63 @@ export default async function SubscriptionPage() {
             </span>
           </div>
 
-          {/* Expiry Date */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
-            <span style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", fontWeight: 600 }}>تاريخ الانتهاء:</span>
-            <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--color-text)" }} dir="ltr">
-              {endDate ? `${endDate.getDate()}/${endDate.getMonth() + 1}/${endDate.getFullYear()}` : "غير محدد"}
-            </span>
-          </div>
+          {/* Expiry Date (relevant only for trials/ends) */}
+          {store.subscription_ends_at && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
+              <span style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", fontWeight: 600 }}>تاريخ الانتهاء:</span>
+              <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--color-text)" }} dir="ltr">
+                {new Date(store.subscription_ends_at).toLocaleDateString("ar-EG")}
+              </span>
+            </div>
+          )}
+        </div>
 
-          {/* Remaining Days Counter */}
-          <div
+        {/* Dynamic CTA Buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1.5rem" }}>
+          <Link
+            href="/pricing"
+            className="btn-primary"
             style={{
-              background: isTrial ? "var(--color-warning-muted)" : "var(--color-primary-muted)",
-              border: `1px solid ${isTrial ? "rgba(245,158,11,0.2)" : "var(--color-primary-glow)"}`,
-              borderRadius: "var(--radius-md)",
-              padding: "1rem",
+              textDecoration: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              padding: "0.875rem",
+              fontWeight: 800,
+              fontSize: "0.9375rem",
               textAlign: "center",
             }}
           >
-            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginBottom: "0.25rem", fontWeight: 600 }}>
-              الوقت المتبقي لمتجرك:
-            </p>
-            <h3 style={{ fontSize: "1.5rem", fontWeight: 900, color: isTrial ? "var(--color-warning)" : "var(--color-primary)" }}>
-              {daysRemaining} أيام متبقية
-            </h3>
-          </div>
-        </div>
+            🚀 ترقية أو تغيير باقة الاشتراك
+          </Link>
 
-        {/* Dynamic CTA Button */}
-        <a
-          href={waUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-            width: "100%",
-            padding: "0.875rem",
-            marginTop: "1.5rem",
-            background: "#25D366",
-            color: "#fff",
-            borderRadius: "var(--radius-full)",
-            fontFamily: "var(--font-cairo), sans-serif",
-            fontWeight: 800,
-            fontSize: "0.9375rem",
-            textDecoration: "none",
-            boxShadow: "0 4px 12px rgba(37,211,102,0.3)",
-            textAlign: "center",
-            transition: "all 0.15s",
-          }}
-        >
-          💬 {isTrial ? "الترقية للباقة المدفوعة" : "تجديد الاشتراك الحالي"}
-        </a>
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              width: "100%",
+              padding: "0.875rem",
+              background: "#25D366",
+              color: "#fff",
+              borderRadius: "var(--radius-full)",
+              fontWeight: 800,
+              fontSize: "0.9375rem",
+              textDecoration: "none",
+              boxShadow: "0 4px 12px rgba(37,211,102,0.3)",
+              textAlign: "center",
+              border: "none",
+            }}
+          >
+            💬 تواصل مع الدعم الفني لتأكيد الدفع يدوياً
+          </a>
+        </div>
       </div>
 
       {/* Pricing Information Card */}
@@ -160,11 +152,13 @@ export default async function SubscriptionPage() {
           💡 الباقات المتاحة وطريقة الدفع:
         </h4>
         <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-          1. الباقة الشهرية (النمو السريع): <strong style={{ color: "var(--color-text)" }}>5$ شهرياً</strong>. تمنحك منتجات غير محدودة وتحديثات فورية مع رنين الإشعارات الحية وتصدير البيانات.
+          1. <strong>الباقة المجانية (Free)</strong>: مجاناً للأبد مع 15 منتج، 3 فئات، و100 طلب/شهر.
           <br />
-          2. الباقة السنوية (التاجر الجاد): <strong style={{ color: "var(--color-text)" }}>50$ سنوياً</strong>. تمنحك خصماً فورياً يبلغ 17% مع أولوية قصوى للميزات والدعم الفني.
+          2. <strong>باقة البداية (Starter)</strong>: <strong style={{ color: "var(--color-text)" }}>5$ شهرياً</strong> مع 100 منتج، 15 فئة، و500 طلب/شهر.
           <br />
-          3. لتفعيل الاشتراك، اضغط على زر التواصل أعلاه لتصل إلى الدعم المالي عبر الواتساب لتأكيد الدفع يدوياً وتنشيط حسابك فوراً.
+          3. <strong>الباقة الاحترافية (Pro)</strong>: <strong style={{ color: "var(--color-text)" }}>15$ شهرياً</strong> لمنتجات وطلبات غير محدودة وإزالة شعار دكاني بالكامل.
+          <br />
+          4. لتفعيل الاشتراك، اضغط على زر الترقية أعلاه أو تواصل مع الدعم الفني عبر الواتساب لتأكيد الدفع يدوياً وتنشيط حسابك فوراً.
         </p>
       </div>
     </div>

@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/Toast";
 import { PRODUCT_NAME_MAX_CHARS } from "@/lib/constants";
 import type { CategoryRow, ProductRow } from "@/types/database";
 import { parseProductOptions } from "@/lib/validations";
+import UpgradePlanModal from "@/components/dashboard/UpgradePlanModal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -166,12 +167,37 @@ export default function ProductForm({ product }: ProductFormProps) {
   const [errors, setErrors]       = useState<FormErrors>({});
   const [saving, setSaving]       = useState(false);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [planLimits, setPlanLimits] = useState<{
+    maxImagesPerProduct: number;
+    maxProducts: number;
+    planNameAr: string;
+  } | null>(null);
 
-  // ── Fetch categories for select ───────────────────────────────────────────
+  const [limitError, setLimitError] = useState<{
+    isOpen: boolean;
+    limitType?: string;
+    limitValue?: number;
+    currentValue?: number;
+  }>({ isOpen: false });
+
+  // ── Fetch categories & plan limits for select ───────────────────────────────────────────
   useEffect(() => {
     fetch("/api/categories")
       .then((r) => r.json())
       .then((j) => setCategories(j.data ?? []))
+      .catch(() => {});
+
+    fetch("/api/store/plan-usage")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.data) {
+          setPlanLimits({
+            maxImagesPerProduct: j.data.limits.maxImagesPerProduct,
+            maxProducts: j.data.limits.maxProducts,
+            planNameAr: j.data.limits.nameAr,
+          });
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -318,6 +344,15 @@ export default function ProductForm({ product }: ProductFormProps) {
       const json = await res.json();
 
       if (!res.ok) {
+        if (json.error === "PLAN_LIMIT_REACHED") {
+          setLimitError({
+            isOpen: true,
+            limitType: json.limitType,
+            limitValue: json.limitValue,
+            currentValue: json.currentValue,
+          });
+          return;
+        }
         if (json.details && typeof json.details === "object") {
           setErrors(json.details as FormErrors);
         } else {
@@ -497,29 +532,32 @@ export default function ProductForm({ product }: ProductFormProps) {
         )}
 
         {/* Upload Zone */}
-        {form.images.length < 5 ? (
-          <ImageUpload
-            key={form.images.length}
-            currentImageUrl={null}
-            onUploadComplete={addImageUrl}
-            disabled={saving}
-            label={form.images.length === 0 ? "اسحب وارفع صورة المنتج الرئيسية" : "ارفع صورة إضافية للمنتج"}
-          />
-        ) : (
-          <div
-            style={{
-              padding: "0.75rem",
-              background: "var(--color-surface-2)",
-              borderRadius: "var(--radius-md)",
-              fontSize: "0.8125rem",
-              color: "var(--color-text-muted)",
-              textAlign: "center",
-              border: "1px dashed var(--color-border)",
-            }}
-          >
-            💡 وصلت للحد الأقصى المسموح به (5 صور). قم بحذف صورة لإضافة أخرى.
-          </div>
-        )}
+        {(() => {
+          const maxImagesLimit = planLimits?.maxImagesPerProduct === -1 ? 15 : (planLimits?.maxImagesPerProduct ?? 2);
+          return form.images.length < maxImagesLimit ? (
+            <ImageUpload
+              key={form.images.length}
+              currentImageUrl={null}
+              onUploadComplete={addImageUrl}
+              disabled={saving}
+              label={form.images.length === 0 ? "اسحب وارفع صورة المنتج الرئيسية" : "ارفع صورة إضافية للمنتج"}
+            />
+          ) : (
+            <div
+              style={{
+                padding: "0.75rem",
+                background: "var(--color-surface-2)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "0.8125rem",
+                color: "var(--color-text-muted)",
+                textAlign: "center",
+                border: "1px dashed var(--color-border)",
+              }}
+            >
+              💡 وصلت للحد الأقصى المسموح به لباقتك ({maxImagesLimit} صور). قم بحذف صورة لإضافة أخرى.
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Core fields ── */}
@@ -946,6 +984,14 @@ export default function ProductForm({ product }: ProductFormProps) {
           إلغاء
         </button>
       </div>
+
+      <UpgradePlanModal
+        isOpen={limitError.isOpen}
+        onClose={() => setLimitError({ isOpen: false })}
+        limitType={limitError.limitType}
+        limitValue={limitError.limitValue}
+        currentValue={limitError.currentValue}
+      />
     </form>
   );
 }

@@ -234,6 +234,24 @@ export async function POST(request: NextRequest) {
     0
   );
 
+  // ── Plan Limit Checks (Monthly Order Limit) ──────────────────────────────
+  try {
+    const { getStorePlanUsage } = await import("@/lib/plans");
+    const planUsage = await getStorePlanUsage(supabase, store.id);
+
+    if (planUsage.limits.maxOrdersPerMonth !== -1 && planUsage.usage.orders >= planUsage.limits.maxOrdersPerMonth) {
+      return Response.json({
+        error: "PLAN_LIMIT_REACHED",
+        limitType: "orders",
+        limitValue: planUsage.limits.maxOrdersPerMonth,
+        currentValue: planUsage.usage.orders,
+        message: "نعتذر، لقد تجاوز هذا المتجر حد استقبال الطلبات الشهري لباقته الحالية."
+      }, { status: 403 });
+    }
+  } catch (planErr) {
+    console.error("[POST /api/orders] plan limits check error:", planErr);
+  }
+
   // ── Insert order ──────────────────────────────────────────────────────────
   const { data: order, error: orderError } = await supabase
     .from("orders")

@@ -127,6 +127,38 @@ export async function POST(request: NextRequest) {
     return err("بيانات المنتج غير صحيحة", 422, parsed.errors);
   }
 
+  // ── Plan Limit Checks ─────────────────────────────────────────────────────
+  try {
+    const { getStorePlanUsage } = await import("@/lib/plans");
+    const planUsage = await getStorePlanUsage(supabase, store.id);
+
+    // Check product limits
+    if (planUsage.limits.maxProducts !== -1 && planUsage.usage.products >= planUsage.limits.maxProducts) {
+      return Response.json({
+        error: "PLAN_LIMIT_REACHED",
+        limitType: "products",
+        limitValue: planUsage.limits.maxProducts,
+        currentValue: planUsage.usage.products,
+        message: `لقد وصلت إلى الحد الأقصى للمنتجات المسموح بها في باقتك الحالية (${planUsage.limits.maxProducts} منتج). يرجى الترقية لإضافة المزيد.`
+      }, { status: 403 });
+    }
+
+    // Check product image count
+    const { parseProductOptions } = await import("@/lib/validations");
+    const { images } = parseProductOptions(parsed.data.options);
+    if (planUsage.limits.maxImagesPerProduct !== -1 && images && images.length > planUsage.limits.maxImagesPerProduct) {
+      return Response.json({
+        error: "PLAN_LIMIT_REACHED",
+        limitType: "images",
+        limitValue: planUsage.limits.maxImagesPerProduct,
+        currentValue: images.length,
+        message: `لا يمكنك إضافة أكثر من ${planUsage.limits.maxImagesPerProduct} صور للمنتج الواحد في باقتك الحالية (${planUsage.limits.nameAr}). يرجى الترقية.`
+      }, { status: 403 });
+    }
+  } catch (planErr) {
+    console.error("[POST /api/products] plan limits check error:", planErr);
+  }
+
   const { data: product, error } = await supabase
     .from("products")
     .insert({
@@ -180,6 +212,28 @@ export async function PUT(request: NextRequest) {
 
   // Explicitly remove store_id from update payload if client somehow sent it
   const { ...updatePayload } = parsed.data;
+
+  // ── Plan Limit Checks (Images count check on update) ─────────────────────
+  if (parsed.data.options !== undefined) {
+    try {
+      const { getStorePlanUsage } = await import("@/lib/plans");
+      const planUsage = await getStorePlanUsage(supabase, store.id);
+
+      const { parseProductOptions } = await import("@/lib/validations");
+      const { images } = parseProductOptions(parsed.data.options);
+      if (planUsage.limits.maxImagesPerProduct !== -1 && images && images.length > planUsage.limits.maxImagesPerProduct) {
+        return Response.json({
+          error: "PLAN_LIMIT_REACHED",
+          limitType: "images",
+          limitValue: planUsage.limits.maxImagesPerProduct,
+          currentValue: images.length,
+          message: `لا يمكنك إضافة أكثر من ${planUsage.limits.maxImagesPerProduct} صور للمنتج الواحد في باقتك الحالية (${planUsage.limits.nameAr}). يرجى الترقية.`
+        }, { status: 403 });
+      }
+    } catch (planErr) {
+      console.error("[PUT /api/products] plan limits check error:", planErr);
+    }
+  }
 
   const { data: product, error } = await supabase
     .from("products")

@@ -96,7 +96,7 @@ export default async function StorePage({
   // ── Fetch store ───────────────────────────────────────────────────────────
   const { data: store, error: storeError } = await supabase
     .from("stores")
-    .select("id, name, slug, logo_url, currency_code, is_active, announcement_text, description")
+    .select("id, name, slug, logo_url, currency_code, is_active, announcement_text, description, plan_tier")
     .eq("slug", slug)
     .single();
 

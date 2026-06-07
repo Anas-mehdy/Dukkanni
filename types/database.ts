@@ -41,6 +41,11 @@ export interface StoreRow {
   description:   string | null;
   created_at:    string;
   updated_at:    string;
+  plan_tier:     string;
+  plan_type:     string;
+  subscription_status: string;
+  trial_ends_at: string;
+  subscription_ends_at: string | null;
 }
 
 export interface CategoryRow {

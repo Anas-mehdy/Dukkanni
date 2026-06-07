@@ -101,6 +101,25 @@ export async function POST(request: NextRequest) {
     return err("بيانات الفئة غير صحيحة", 422, parsed.errors);
   }
 
+  // ── Plan Limit Checks ─────────────────────────────────────────────────────
+  try {
+    const { getStorePlanUsage } = await import("@/lib/plans");
+    const planUsage = await getStorePlanUsage(supabase, store.id);
+
+    // Check category limits
+    if (planUsage.limits.maxCategories !== -1 && planUsage.usage.categories >= planUsage.limits.maxCategories) {
+      return Response.json({
+        error: "PLAN_LIMIT_REACHED",
+        limitType: "categories",
+        limitValue: planUsage.limits.maxCategories,
+        currentValue: planUsage.usage.categories,
+        message: `لقد وصلت إلى الحد الأقصى للفئات المسموح بها في باقتك الحالية (${planUsage.limits.maxCategories} فئة). يرجى الترقية لإضافة المزيد.`
+      }, { status: 403 });
+    }
+  } catch (planErr) {
+    console.error("[POST /api/categories] plan limits check error:", planErr);
+  }
+
   const { data: category, error } = await supabase
     .from("categories")
     .insert({

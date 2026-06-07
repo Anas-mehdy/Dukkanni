@@ -28,7 +28,7 @@ import { parseProductOptions } from "@/lib/validations";
 // ---------------------------------------------------------------------------
 
 interface StoreViewProps {
-  store:      Pick<StoreRow, "id" | "name" | "slug" | "logo_url" | "currency_code"> & { announcement_text?: string | null; description?: string | null };
+  store:      Pick<StoreRow, "id" | "name" | "slug" | "logo_url" | "currency_code"> & { announcement_text?: string | null; description?: string | null; plan_tier?: string | null };
   categories: Pick<CategoryRow, "id" | "name" | "sort_order">[];
   products:   Pick<ProductRow, "id" | "name" | "price" | "image_url" | "is_active" | "is_available" | "sort_order" | "category_id" | "options">[];
 }
@@ -656,36 +656,38 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       }}
     >
       {/* Dukkanni Referral Banner */}
-      <div
-        style={{
-          background: "var(--color-surface-2)",
-          borderBottom: "1px solid var(--color-border)",
-          padding: "0.45rem 1rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "0.75rem",
-          fontWeight: 700,
-          color: "var(--color-text-muted)",
-          textAlign: "center",
-          direction: t.dir,
-        }}
-      >
-        <span>
-          {t.dukkanniPromo}{" "}
-          <a
-            href="/"
-            style={{
-              color: "var(--color-primary)",
-              textDecoration: "underline",
-              fontWeight: 800,
-              marginInlineStart: "0.25rem",
-            }}
-          >
-            {t.dukkanniPromoLink}
-          </a>
-        </span>
-      </div>
+      {store.plan_tier !== "pro" && (
+        <div
+          style={{
+            background: "var(--color-surface-2)",
+            borderBottom: "1px solid var(--color-border)",
+            padding: "0.45rem 1rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            color: "var(--color-text-muted)",
+            textAlign: "center",
+            direction: t.dir,
+          }}
+        >
+          <span>
+            {t.dukkanniPromo}{" "}
+            <a
+              href="/"
+              style={{
+                color: "var(--color-primary)",
+                textDecoration: "underline",
+                fontWeight: 800,
+                marginInlineStart: "0.25rem",
+              }}
+            >
+              {t.dukkanniPromoLink}
+            </a>
+          </span>
+        </div>
+      )}
 
       {/* Announcement Bar Marquee */}
       {store.announcement_text && (() => {
