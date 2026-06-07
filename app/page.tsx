@@ -238,7 +238,10 @@ export default async function RootPage() {
       <section id="pricing" className="py-20 md:py-28 bg-[var(--color-surface)]/40 border-t border-b border-[var(--color-border)]/60">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--color-text)] mb-4">
+            <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+              عرض خاص للإطلاق: الباقة المجانية متاحة لأول 100 متجر فقط! ⚡
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--color-text)] mt-4 mb-4">
               خطط أسعار شفافة وبسيطة 💰
             </h2>
             <p className="text-sm sm:text-base text-[var(--color-text-muted)] max-w-2xl mx-auto">
@@ -247,20 +250,22 @@ export default async function RootPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            {/* Package 1: Free Trial */}
+            {/* Package 1: Free Plan */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-8 rounded-2xl flex flex-col justify-between">
               <div>
-                <h3 className="text-lg font-bold text-[var(--color-text-muted)] mb-2">الباقة التجريبية</h3>
+                <h3 className="text-lg font-bold text-[var(--color-text-muted)] mb-2">الباقة المجانية</h3>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-text)]">مجاناً</span>
+                  <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-text)]">0$</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">/ دائماً</span>
                 </div>
-                <p className="text-xs text-[var(--color-text-muted)] mb-6">تجربة كاملة ومثالية للمبتدئين لاستكشاف النظام.</p>
+                <p className="text-xs text-[var(--color-text-muted)] mb-6">مثالية لتجربة المنصة وبدء النشاط التجاري الصغير جداً.</p>
                 <div className="border-t border-[var(--color-border)] pt-6">
                   <ul className="flex flex-col gap-3 text-sm text-[var(--color-text-muted)]">
-                    <li className="flex items-center gap-2">🟢 مدة تجريبية 7 أيام كاملة</li>
-                    <li className="flex items-center gap-2">🟢 كافة الميزات مفعلة</li>
-                    <li className="flex items-center gap-2">🟢 لا تحتاج لبطاقة ائتمان</li>
-                    <li className="flex items-center gap-2">🟢 دعم فني متكامل</li>
+                    <li className="flex items-center gap-2">🟢 15 منتج كحد أقصى</li>
+                    <li className="flex items-center gap-2">🟢 3 فئات لتنظيم المنتجات</li>
+                    <li className="flex items-center gap-2">🟢 صورة أو صورتين للمنتج الواحد</li>
+                    <li className="flex items-center gap-2">🟢 100 طلب شهرياً</li>
+                    <li className="flex items-center gap-2">🔴 وجود شعار دكاني بالمتجر</li>
                   </ul>
                 </div>
               </div>
@@ -268,29 +273,29 @@ export default async function RootPage() {
                 href={ctaRoute}
                 className="mt-8 block w-full py-3 bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] text-[var(--color-text)] font-bold rounded-xl text-center text-sm border border-[var(--color-border)] transition-colors"
               >
-                ابدأ تجربتك المجانية
+                ابدأ متجرك مجاناً
               </Link>
             </div>
 
-            {/* Package 2: Monthly GROWTH (Popular) */}
+            {/* Package 2: Starter Plan (Popular) */}
             <div className="bg-[var(--color-surface)] border-2 border-emerald-500 p-8 rounded-2xl flex flex-col justify-between relative transform scale-102 shadow-xl">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-emerald-500 text-white text-xs font-extrabold rounded-full select-none">
                 الأكثر اختياراً 🔥
               </div>
               <div>
-                <h3 className="text-lg font-bold text-emerald-400 mb-2">النمو السريع (الشهرية)</h3>
+                <h3 className="text-lg font-bold text-emerald-400 mb-2">باقة البداية (Starter)</h3>
                 <div className="flex items-baseline gap-1 mb-6">
                   <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-text)]">5$</span>
                   <span className="text-xs text-[var(--color-text-muted)]">/ شهرياً</span>
                 </div>
-                <p className="text-xs text-[var(--color-text-muted)] mb-6">الخيار المثالي للمحلات وموزعي التجزئة النشطين.</p>
+                <p className="text-xs text-[var(--color-text-muted)] mb-6">الخيار المثالي للمتاجر المنزلية وبائعي التجزئة النامين.</p>
                 <div className="border-t border-[var(--color-border)] pt-6">
                   <ul className="flex flex-col gap-3 text-sm text-[var(--color-text-muted)]">
-                    <li className="flex items-center gap-2">🟢 عدد منتجات غير محدود 📦</li>
-                    <li className="flex items-center gap-2">🟢 تنبيهات رنين الطلب الحية 🔔</li>
-                    <li className="flex items-center gap-2">🟢 إحصائيات وتصدير إكسل 📊</li>
-                    <li className="flex items-center gap-2">🟢 طباعة الفواتير وقوائم التحضير 🖨️</li>
-                    <li className="flex items-center gap-2">🟢 رابط ساب دومين مخصص</li>
+                    <li className="flex items-center gap-2">🟢 100 منتج كحد أقصى 📦</li>
+                    <li className="flex items-center gap-2">🟢 15 فئة لتنظيم المنتجات 📂</li>
+                    <li className="flex items-center gap-2">🟢 حتى 4 صور للمنتج الواحد 📸</li>
+                    <li className="flex items-center gap-2">🟢 500 طلب شهرياً 📈</li>
+                    <li className="flex items-center gap-2">🔴 وجود شعار دكاني بالمتجر</li>
                   </ul>
                 </div>
               </div>
@@ -302,29 +307,30 @@ export default async function RootPage() {
               </Link>
             </div>
 
-            {/* Package 3: Annual */}
+            {/* Package 3: Pro Plan */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-8 rounded-2xl flex flex-col justify-between">
               <div>
-                <h3 className="text-lg font-bold text-[var(--color-text-muted)] mb-2">التاجر الجاد (السنوية)</h3>
+                <h3 style={{ color: "#a855f7" }} className="text-lg font-bold mb-2">الباقة الاحترافية (Pro)</h3>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-text)]">50$</span>
-                  <span className="text-xs text-[var(--color-text-muted)]">/ سنوياً</span>
+                  <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-text)]">15$</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">/ شهرياً</span>
                 </div>
-                <p className="text-xs text-emerald-455 font-bold mb-6">وفر 17% عند الاشتراك السنوي 💰</p>
+                <p className="text-xs text-[var(--color-text-muted)] mb-6">للتجار الجادين الساعين لبناء هوية خاصة خالية من أي قيود.</p>
                 <div className="border-t border-[var(--color-border)] pt-6">
                   <ul className="flex flex-col gap-3 text-sm text-[var(--color-text-muted)]">
-                    <li className="flex items-center gap-2">🟢 جميع ميزات باقة النمو السريع</li>
-                    <li className="flex items-center gap-2">🟢 توفير سنوي قدره 17%</li>
-                    <li className="flex items-center gap-2">🟢 أولوية في الميزات الجديدة</li>
-                    <li className="flex items-center gap-2">🟢 دعم فني مخصص VIP</li>
+                    <li className="flex items-center gap-2">🟢 منتجات وفئات غير محدودة 📦</li>
+                    <li className="flex items-center gap-2">🟢 صور منتجات غير محدودة 📸</li>
+                    <li className="flex items-center gap-2">🟢 طلبات مبيعات غير محدودة 📈</li>
+                    <li className="flex items-center gap-2">🟢 <strong>إزالة شعار دكاني بالكامل</strong> 🎨</li>
+                    <li className="flex items-center gap-2">🟢 دعم فني مخصص VIP ⭐️</li>
                   </ul>
                 </div>
               </div>
               <Link
                 href={ctaRoute}
-                className="mt-8 block w-full py-3 bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] text-[var(--color-text)] font-bold rounded-xl text-center text-sm border border-[var(--color-border)] transition-colors"
+                className="mt-8 block w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl text-center text-sm transition-opacity hover:opacity-90 shadow-md"
               >
-                اختر الباقة السنوية
+                اختر الباقة الاحترافية
               </Link>
             </div>
           </div>
