@@ -398,14 +398,32 @@ export default function ProductsPage() {
     <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "5rem" }}>
 
       {/* Page header */}
-      <div style={{ marginBottom: "1rem" }}>
-        <h1 style={{ fontSize: "1.25rem", fontWeight: 800 }}>المنتجات</h1>
-        {!loading && (
-          <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
-            {products.length} منتج — {activeCount} ظاهر للعملاء
-            {inactiveCount > 0 && ` · ${inactiveCount} مخفي مؤقتاً`}
-          </p>
-        )}
+      <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <h1 style={{ fontSize: "1.25rem", fontWeight: 800 }}>المنتجات</h1>
+          {!loading && (
+            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
+              {products.length} منتج — {activeCount} ظاهر للعملاء
+              {inactiveCount > 0 && ` · ${inactiveCount} مخفي مؤقتاً`}
+            </p>
+          )}
+        </div>
+        <Link
+          href="/dashboard/products/import"
+          className="btn-secondary"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "0.8125rem",
+            padding: "0.5rem 0.875rem",
+            minHeight: "34px",
+            fontWeight: 700,
+            textDecoration: "none"
+          }}
+        >
+          📥 استيراد
+        </Link>
       </div>
 
       {/* Search bar */}
