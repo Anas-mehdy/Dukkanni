@@ -53,6 +53,25 @@ function getCategoryEmoji(name: string): string {
 // Premium Grid Product Card Component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Helper: Calculate discounted price for automatic promotions
+// ---------------------------------------------------------------------------
+
+function calculateDiscountedPrice(originalPrice: number, promo: any): number {
+  if (!promo) return originalPrice;
+  let discounted = originalPrice;
+  if (promo.discount_type === "percentage") {
+    discounted = originalPrice * (1 - promo.discount_value / 100);
+  } else if (promo.discount_type === "fixed") {
+    discounted = Math.max(0, originalPrice - promo.discount_value);
+  }
+  return Math.round((discounted + Number.EPSILON) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Premium Grid Product Card Component
+// ---------------------------------------------------------------------------
+
 function ProductCard({
   product,
   currencySymbol,
@@ -63,6 +82,7 @@ function ProductCard({
   onCardClick,
   t,
   lang,
+  activePromo,
 }: {
   product:       StoreViewProps["products"][number];
   currencySymbol: string;
@@ -73,6 +93,7 @@ function ProductCard({
   onCardClick:   () => void;
   t:             any;
   lang:          string;
+  activePromo?:  any;
 }) {
   return (
     <div
@@ -123,6 +144,30 @@ function ProductCard({
           position:       "relative"
         }}
       >
+        {activePromo && (
+          <div
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: lang === "ar" ? "8px" : "auto",
+              left: lang === "ar" ? "auto" : "8px",
+              background: "var(--color-danger)",
+              color: "#ffffff",
+              fontSize: "0.6875rem",
+              fontWeight: 800,
+              padding: "2px 8px",
+              borderRadius: "var(--radius-sm)",
+              boxShadow: "0 2px 6px rgba(239, 68, 68, 0.4)",
+              zIndex: 10,
+            }}
+          >
+            {activePromo.discount_type === "percentage" ? (
+              `${lang === "ar" ? "خصم" : "SALE"} %${activePromo.discount_value}`
+            ) : (
+              `${lang === "ar" ? "خصم" : "SALE"} -${activePromo.discount_value} ${currencySymbol}`
+            )}
+          </div>
+        )}
         {product.image_url ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -163,8 +208,8 @@ function ProductCard({
           const { variants: opts } = parseProductOptions(product.options);
           const hasCustomOptionPrices = opts.some((opt) => opt.hasCustomPrice && opt.values?.length > 0);
           
+          let minPrice: number | null = null;
           if (hasCustomOptionPrices) {
-            let minPrice: number | null = null;
             for (const opt of opts) {
               if (opt.hasCustomPrice && opt.values) {
                 for (const v of opt.values) {
@@ -177,7 +222,42 @@ function ProductCard({
                 }
               }
             }
+          }
 
+          if (activePromo) {
+            const originalBase = hasCustomOptionPrices && minPrice !== null ? minPrice : product.price;
+            const discountedBase = calculateDiscountedPrice(originalBase, activePromo);
+            
+            const originalText = originalBase.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const discountedText = discountedBase.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            return (
+              <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexWrap: "wrap", marginTop: "2px" }}>
+                <span
+                  style={{
+                    fontSize:   "1rem",
+                    fontWeight: 850,
+                    color:      "var(--color-danger)",
+                    lineHeight: 1
+                  }}
+                >
+                  {currencySymbol}{discountedText}
+                </span>
+                <span
+                  style={{
+                    fontSize:   "0.8125rem",
+                    color:      "var(--color-text-faint)",
+                    textDecoration: "line-through",
+                    fontWeight: 500,
+                  }}
+                >
+                  {currencySymbol}{originalText}
+                </span>
+              </div>
+            );
+          }
+
+          if (hasCustomOptionPrices) {
             if (minPrice !== null) {
               const formattedMinPrice = minPrice.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               const labelText = lang === "ar" 
@@ -359,6 +439,36 @@ export default function StoreView({ store, categories, products }: StoreViewProp
   const [localQty, setLocalQty] = useState(1);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [activePromo, setActivePromo] = useState<any>(null);
+
+  useEffect(() => {
+    if (!store.id) return;
+    const fetchPromo = async () => {
+      try {
+        const { createPublicClient } = await import("@/lib/supabase/public");
+        const supabase = createPublicClient();
+        const now = new Date().toISOString();
+        const { data } = await supabase
+          .from("promotions")
+          .select("id, name, discount_type, discount_value")
+          .eq("store_id", store.id)
+          .eq("is_active", true)
+          .is("code", null) // Automatic promotion
+          .lte("start_date", now)
+          .gte("end_date", now)
+          .order("discount_value", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          setActivePromo(data);
+        }
+      } catch (err) {
+        console.error("Failed to load storefront promotion:", err);
+      }
+    };
+    fetchPromo();
+  }, [store.id]);
 
   // Swipe gesture tracking state
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -578,7 +688,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
       cart.addItem({
         productId: product.id,
         name:      translatedName ?? product.name,
-        price:     product.price,
+        price:     calculateDiscountedPrice(product.price, activePromo),
         imageUrl:  product.image_url,
       });
     }
@@ -626,12 +736,13 @@ export default function StoreView({ store, categories, products }: StoreViewProp
     });
 
     const finalPrice = getCumulativePrice(p, selectedOptions);
+    const discountedPrice = calculateDiscountedPrice(finalPrice, activePromo);
     const translatedName = lang === "ar" ? p.name : (translatedProducts[lang]?.[p.id] ?? p.name);
 
     cart.addItem({
       productId: p.id,
       name:      translatedName,
-      price:     finalPrice,
+      price:     discountedPrice,
       imageUrl:  p.image_url,
       selectedOptions: opts.length > 0 ? selectedOptionsArray : undefined,
     }, localQty);
@@ -1094,6 +1205,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                           onCardClick={() => handleCardClick(product)}
                           t={t}
                           lang={lang}
+                          activePromo={activePromo}
                         />
                       );
                     })}
@@ -1137,6 +1249,7 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                         onCardClick={() => handleCardClick(product)}
                         t={t}
                         lang={lang}
+                        activePromo={activePromo}
                       />
                     );
                   })}
@@ -1632,7 +1745,20 @@ export default function StoreView({ store, categories, products }: StoreViewProp
                       </span>
                       <span style={{ opacity: 0.8, fontWeight: 700 }}>•</span>
                       <span>
-                        {(cumulativePrice * localQty).toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
+                        {activePromo ? (
+                          <>
+                            <span style={{ textDecoration: "line-through", opacity: 0.6, fontSize: "0.8rem", marginInlineEnd: "6px" }}>
+                              {(cumulativePrice * localQty).toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })}
+                            </span>
+                            <span>
+                              {(calculateDiscountedPrice(cumulativePrice, activePromo) * localQty).toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
+                            </span>
+                          </>
+                        ) : (
+                          <span>
+                            {(cumulativePrice * localQty).toLocaleString(lang === "tr" ? "tr-TR" : "en-US", { minimumFractionDigits: 2 })} {currencySymbol}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </div>

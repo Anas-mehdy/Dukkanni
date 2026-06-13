@@ -414,6 +414,9 @@ export default function DashboardPage() {
         <Link href="/dashboard/orders" className="btn-ghost" style={{ textDecoration: "none", textAlign: "center", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           عرض الطلبات
         </Link>
+        <Link href="/dashboard/promotions" className="btn-ghost" style={{ textDecoration: "none", textAlign: "center", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-surface-2)", color: "var(--color-text)", borderColor: "var(--color-border)" }}>
+          🏷️ العروض والكوبونات
+        </Link>
       </div>
 
       {/* WhatsApp Support Button */}

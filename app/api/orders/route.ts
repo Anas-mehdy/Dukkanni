@@ -59,6 +59,14 @@ const orderSchema = z.object({
     .min(7, "رقم الهاتف غير صالح")
     .max(30, "رقم الهاتف طويل جداً"),
 
+  couponCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+
   items: z
     .array(
       z.object({
@@ -153,7 +161,7 @@ export async function POST(request: NextRequest) {
     return err("بيانات الطلب غير مكتملة", 422, errors);
   }
 
-  const { storeSlug, customerName, customerPhone, items } = parsed.data;
+  const { storeSlug, customerName, customerPhone, couponCode, items } = parsed.data;
 
   // ── Resolve store (server-side — source of truth for store_id & phone) ────
   const { data: store, error: storeError } = await supabase
@@ -168,6 +176,19 @@ export async function POST(request: NextRequest) {
   if (!store.is_active) {
     return err("هذا المتجر غير نشط حالياً", 403);
   }
+
+  // ── Fetch active automatic promotions ─────────────────────────────────────
+  const { data: automaticPromo } = await supabase
+    .from("promotions")
+    .select("id, name, discount_type, discount_value")
+    .eq("store_id", store.id)
+    .eq("is_active", true)
+    .is("code", null) // Automatic promotion
+    .lte("start_date", new Date().toISOString())
+    .gte("end_date", new Date().toISOString())
+    .order("discount_value", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   // ── Resolve product prices from DB (never trust client prices) ────────────
   const productIds = items.map((i) => i.productId);
@@ -198,11 +219,14 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Build order line items with DB prices ─────────────────────────────────
+  let totalOriginalAmount = 0;
+  let totalAutomaticDiscount = 0;
+
   const lineItems = items.map((item) => {
     const product = productMap.get(item.productId) as { id: string; name: string; price: number; options: any; is_active: boolean };
     
     // Parse cumulative options pricing modifiers
-    let resolvedPrice = product.price;
+    let basePrice = product.price;
     const details: string[] = [];
     const { variants: productOptions } = parseProductOptions(product.options);
 
@@ -212,11 +236,25 @@ export async function POST(request: NextRequest) {
         if (matchOpt && matchOpt.hasCustomPrice) {
           const matchVal = matchOpt.values?.find((v: any) => v.value === selOpt.value);
           if (matchVal && matchVal.price != null) {
-            resolvedPrice += matchVal.price; // Add cumulative modifier
+            basePrice += matchVal.price; // Add cumulative modifier
           }
         }
         details.push(`${selOpt.name}: ${selOpt.value}`);
       });
+    }
+
+    const itemOriginalPrice = basePrice;
+    totalOriginalAmount += itemOriginalPrice * item.quantity;
+
+    let resolvedPrice = basePrice;
+    if (automaticPromo) {
+      if (automaticPromo.discount_type === "percentage") {
+        resolvedPrice = basePrice * (1 - automaticPromo.discount_value / 100);
+      } else if (automaticPromo.discount_type === "fixed") {
+        resolvedPrice = Math.max(0, basePrice - automaticPromo.discount_value);
+      }
+      resolvedPrice = Math.round((resolvedPrice + Number.EPSILON) * 100) / 100;
+      totalAutomaticDiscount += (itemOriginalPrice - resolvedPrice) * item.quantity;
     }
 
     const formattedName = product.name + (details.length > 0 ? ` (${details.join(", ")})` : "");
@@ -229,10 +267,68 @@ export async function POST(request: NextRequest) {
     };
   });
 
-  const totalAmount = lineItems.reduce(
+  const subtotal = lineItems.reduce(
     (sum, li) => sum + li.unit_price * li.quantity,
     0
   );
+
+  // ── Process Coupon Code if provided ───────────────────────────────────────
+  let promoId: string | null = null;
+  let appliedCouponCode: string | null = null;
+  let couponDiscountAmount = 0;
+
+  if (couponCode && couponCode.trim() !== "") {
+    const cleanCoupon = couponCode.trim().toUpperCase();
+
+    // Fetch coupon from DB
+    const { data: couponPromo } = await supabase
+      .from("promotions")
+      .select("id, code, name, discount_type, discount_value, start_date, end_date, is_active, max_uses")
+      .eq("store_id", store.id)
+      .eq("code", cleanCoupon)
+      .maybeSingle();
+
+    if (couponPromo && couponPromo.is_active) {
+      const now = new Date();
+      const startDate = new Date(couponPromo.start_date);
+      const endDate = new Date(couponPromo.end_date);
+
+      if (now >= startDate && now <= endDate) {
+        // Validate usage limit
+        let isLimitOk = true;
+        if (couponPromo.max_uses != null) {
+          const { count } = await supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("promotion_id", couponPromo.id);
+
+          if ((count ?? 0) >= couponPromo.max_uses) {
+            isLimitOk = false;
+          }
+        }
+
+        if (isLimitOk) {
+          promoId = couponPromo.id;
+          appliedCouponCode = couponPromo.code;
+          if (couponPromo.discount_type === "percentage") {
+            couponDiscountAmount = (subtotal * couponPromo.discount_value) / 100;
+          } else if (couponPromo.discount_type === "fixed") {
+            couponDiscountAmount = Math.min(subtotal, couponPromo.discount_value);
+          }
+          couponDiscountAmount = Math.round((couponDiscountAmount + Number.EPSILON) * 100) / 100;
+        }
+      }
+    }
+  }
+
+  // If no coupon is applied but an automatic promotion is running, associate the order with the automatic promotion
+  if (!promoId && automaticPromo) {
+    promoId = automaticPromo.id;
+    appliedCouponCode = null; // Stored as NULL to represent automatic promotion
+  }
+
+  const finalDiscountAmount = couponDiscountAmount > 0 ? couponDiscountAmount : totalAutomaticDiscount;
+  const finalTotalAmount = Math.max(0, subtotal - couponDiscountAmount);
 
   // ── Plan Limit Checks (Monthly Order Limit) ──────────────────────────────
   try {
@@ -259,11 +355,14 @@ export async function POST(request: NextRequest) {
       store_id:           store.id,
       customer_name:      customerName,
       customer_phone:     customerPhone,
-      total_amount:       totalAmount,
+      total_amount:       finalTotalAmount,
       currency_code:      store.currency_code,
       payment_status:     "cod_pending",
       fulfillment_status: "pending",
       whatsapp_sent_at:   null,
+      promotion_id:       promoId,
+      coupon_code:        appliedCouponCode,
+      discount_amount:    finalDiscountAmount,
     })
     .select("id")
     .single();
@@ -289,8 +388,6 @@ export async function POST(request: NextRequest) {
 
   if (itemsError) {
     console.error("[POST /api/orders] items insert:", itemsError);
-    // Order was created — log but still return success so customer gets WA link
-    // The merchant can see the order without items in a corner case
   }
 
   // ── Mark order as WhatsApp-sent ───────────────────────────────────────────
@@ -307,7 +404,9 @@ export async function POST(request: NextRequest) {
       storeName:    store.name,
       currencyCode: store.currency_code,
       customerName,
-      totalAmount,
+      totalAmount:  finalTotalAmount,
+      discountAmount: finalDiscountAmount,
+      couponCode:   appliedCouponCode,
       items: lineItems.map((li) => ({
         name:      li.product_name,
         quantity:  li.quantity,
@@ -318,3 +417,4 @@ export async function POST(request: NextRequest) {
     201
   );
 }
+

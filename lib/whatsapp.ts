@@ -36,6 +36,8 @@ export interface WhatsAppOrderInput {
   items:        OrderItem[];
   totalAmount:  number;
   currencyCode: string; // ISO 4217 e.g. "TRY", "SAR", "AED"
+  discountAmount?: number;
+  couponCode?:  string | null;
 }
 
 export interface WhatsAppMessageResult {
@@ -220,11 +222,22 @@ export function buildWhatsAppMessage(
   const header = t.waMessageHeader.replace("{storeName}", order.storeName);
 
   // Build footer (always included — even if items are truncated)
-  const footer = [
-    separator,
+  const footerLines = [separator];
+  
+  if (order.discountAmount && order.discountAmount > 0) {
+    const subtotal = order.totalAmount + order.discountAmount;
+    footerLines.push(
+      `${language === "tr" ? "Ara Toplam" : language === "en" ? "Subtotal" : "المجموع الفرعي"}: ${formatAmount(subtotal)} ${symbol}`,
+      `${language === "tr" ? "İndirim" : language === "en" ? "Discount" : "الخصم"}${order.couponCode ? ` (${order.couponCode})` : ""}: -${formatAmount(order.discountAmount)} ${symbol}`
+    );
+  }
+
+  footerLines.push(
     t.waMessageTotal.replace("{total}", formatAmount(order.totalAmount)).replace("{symbol}", symbol),
-    t.waMessageCustomer.replace("{customerName}", order.customerName),
-  ].join("\n");
+    t.waMessageCustomer.replace("{customerName}", order.customerName)
+  );
+
+  const footer = footerLines.join("\n");
 
   // Build individual item lines
   const itemLines: string[] = order.items.map((item) => {

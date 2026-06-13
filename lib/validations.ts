@@ -168,6 +168,89 @@ export const storeSettingsSchema = z.object({
 export type StoreSettingsFormValues = z.infer<typeof storeSettingsSchema>;
 
 // ---------------------------------------------------------------------------
+// Promotions & Coupons
+// ---------------------------------------------------------------------------
+
+const basePromotionSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "اسم العرض مطلوب")
+    .max(120, "اسم العرض لا يتجاوز 120 حرفاً"),
+
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .min(3, "رمز الكوبون لا يقل عن 3 أحرف")
+    .max(30, "رمز الكوبون لا يتجاوز 30 حرفاً")
+    .regex(/^[A-Z0-9_-]+$/, "الرمز يجب أن يحتوي على أحرف إنجليزية كبيرة، أرقام، شرطة (-) أو شرطة سفلية (_) فقط")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+
+  discount_type: z.enum(["percentage", "fixed"], {
+    message: "نوع الخصم غير صالح",
+  }),
+
+  discount_value: z
+    .number()
+    .min(0, "قيمة الخصم لا تقل عن 0")
+    .max(9999999.99, "القيمة مرتفعة جداً"),
+
+  start_date: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), "تاريخ البدء غير صالح"),
+
+  end_date: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), "تاريخ الانتهاء غير صالح"),
+
+  is_active: z.boolean().default(true),
+
+  max_uses: z
+    .number()
+    .int("الحد الأقصى يجب أن يكون عدداً صحيحاً")
+    .min(1, "الحد الأدنى هو 1")
+    .nullable()
+    .optional(),
+
+  target_type: z.enum(["all", "category", "product", "shipping"]).default("all"),
+  target_id: z.string().uuid("المعرّف غير صالح").nullable().optional(),
+});
+
+export const promotionSchema = basePromotionSchema.refine(
+  (data) => {
+    const start = new Date(data.start_date).getTime();
+    const end = new Date(data.end_date).getTime();
+    return start <= end;
+  },
+  {
+    message: "تاريخ الانتهاء لا يمكن أن يكون قبل تاريخ البدء",
+    path: ["end_date"],
+  }
+);
+
+export type PromotionFormValues = z.infer<typeof promotionSchema>;
+
+export const promotionUpdateSchema = basePromotionSchema.partial().refine(
+  (data) => {
+    if (data.start_date && data.end_date) {
+      const start = new Date(data.start_date).getTime();
+      const end = new Date(data.end_date).getTime();
+      return start <= end;
+    }
+    return true;
+  },
+  {
+    message: "تاريخ الانتهاء لا يمكن أن يكون قبل تاريخ البدء",
+    path: ["end_date"],
+  }
+);
+
+export type PromotionUpdateValues = z.infer<typeof promotionUpdateSchema>;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -196,3 +279,4 @@ export function parseFormData<T extends z.ZodTypeAny>(
 
   return { success: false, errors };
 }
+

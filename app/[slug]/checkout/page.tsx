@@ -65,7 +65,9 @@ function buildSafeWhatsAppUrl(
   storeName: string,
   currencyCode: string,
   totalAmount: number,
-  language: "ar" | "tr" | "en"
+  language: "ar" | "tr" | "en",
+  discountAmount?: number,
+  couponCode?: string | null
 ): { url: string; isTruncated: boolean } {
   return buildWhatsAppMessage(phone, {
     storeName,
@@ -73,6 +75,8 @@ function buildSafeWhatsAppUrl(
     currencyCode,
     totalAmount,
     items,
+    discountAmount,
+    couponCode,
   }, language);
 }
 
@@ -100,6 +104,18 @@ export default function CheckoutPage({
     wasTruncated: boolean;
     orderId:      string;
   } | null>(null);
+
+  // Coupon states
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    promotionId: string;
+    code: string;
+    discountType: "percentage" | "fixed";
+    discountValue: number;
+    discountAmount: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   // i18n states
   const [lang, setLang] = useState<"ar" | "tr" | "en">("ar");
@@ -308,6 +324,7 @@ export default function CheckoutPage({
           storeSlug:    slug,
           customerName: customerName.trim(),
           customerPhone: sanitizedPhone,
+          couponCode:   appliedCoupon ? appliedCoupon.code : null,
           items:        cart.items.map((i) => ({
             productId: i.productId,
             quantity:  i.quantity,
@@ -359,7 +376,9 @@ export default function CheckoutPage({
         order.storeName,
         order.currencyCode,
         order.totalAmount,
-        lang
+        lang,
+        (order as any).discountAmount,
+        (order as any).couponCode
       );
 
       // ── Step 3: Clear cart ──────────────────────────────────────────────
@@ -755,6 +774,30 @@ export default function CheckoutPage({
                 );
               })}
 
+              {/* Discount row if coupon applied */}
+              {appliedCoupon && (
+                <div
+                  style={{
+                    display:             "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap:                 "0.5rem",
+                    padding:             "0.625rem 1rem",
+                    borderTop:           "1px solid var(--color-border)",
+                    fontSize:            "0.8125rem",
+                    background:          "var(--color-surface-2)",
+                    color:               "var(--color-danger)",
+                    fontWeight:          700,
+                  }}
+                >
+                  <span>
+                    {lang === "ar" ? "الخصم" : lang === "tr" ? "İndirim" : "Discount"} ({appliedCoupon.code})
+                  </span>
+                  <span>
+                    - {formatPrice(appliedCoupon.discountAmount, currencySymbol, lang)}
+                  </span>
+                </div>
+              )}
+
               {/* Total row */}
               <div
                 style={{
@@ -770,9 +813,127 @@ export default function CheckoutPage({
                   {t.total}
                 </span>
                 <span style={{ fontWeight: 800, fontSize: "1.125rem", color: "var(--color-primary)" }}>
-                  {formatPrice(cart.totalPrice, currencySymbol, lang)}
+                  {formatPrice(
+                    Math.max(0, cart.totalPrice - (appliedCoupon?.discountAmount || 0)),
+                    currencySymbol,
+                    lang
+                  )}
                 </span>
               </div>
+            </div>
+
+            {/* ── Coupon Code Card ── */}
+            <div className="card" style={{ padding: "1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: "0.25rem" }}>
+                🏷️ {lang === "ar" ? "هل لديك كوبون خصم؟" : lang === "tr" ? "Kupon kodunuz var mı?" : "Have a discount coupon?"}
+              </p>
+
+              {appliedCoupon ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "var(--color-success-muted)",
+                    padding: "0.625rem 0.75rem",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--color-success)"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                    <span style={{ fontSize: "0.8125rem", color: "var(--color-success)", fontWeight: 800 }}>
+                      ✓ {lang === "ar" ? "تم تطبيق الكوبون" : lang === "tr" ? "Kupon uygulandı" : "Coupon applied"}:
+                    </span>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--color-text)", fontFamily: "monospace" }}>
+                      {appliedCoupon.code}
+                    </strong>
+                    <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
+                      (-{appliedCoupon.discountType === "percentage" ? `%${appliedCoupon.discountValue}` : formatPrice(appliedCoupon.discountValue, currencySymbol, lang)})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppliedCoupon(null);
+                      setCouponCodeInput("");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-danger)",
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      padding: "4px 8px"
+                    }}
+                  >
+                    {lang === "ar" ? "إزالة" : lang === "tr" ? "Kaldır" : "Remove"}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    placeholder={lang === "ar" ? "أدخل رمز الكوبون" : lang === "tr" ? "Kupon kodunu girin" : "Enter coupon code"}
+                    className="input-base"
+                    style={{ flex: 1, textTransform: "uppercase", direction: "ltr", textAlign: t.dir === "rtl" ? "right" : "left" }}
+                    value={couponCodeInput}
+                    onChange={(e) => {
+                      setCouponCodeInput(e.target.value);
+                      if (couponError) setCouponError("");
+                    }}
+                    disabled={submitting || validatingCoupon}
+                  />
+                  <button
+                    type="button"
+                    disabled={submitting || validatingCoupon || !couponCodeInput.trim()}
+                    onClick={async () => {
+                      setCouponError("");
+                      setValidatingCoupon(true);
+                      try {
+                        const res = await fetch("/api/promotions/validate", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            storeSlug: slug,
+                            code: couponCodeInput.trim(),
+                            subtotal: cart.totalPrice
+                          })
+                        });
+                        const json = await res.json();
+                        if (!res.ok) {
+                          setCouponError(json.error ?? "كود الخصم غير صالح");
+                        } else {
+                          setAppliedCoupon(json.data);
+                        }
+                      } catch {
+                        setCouponError("خطأ في الاتصال بالخادم");
+                      } finally {
+                        setValidatingCoupon(false);
+                      }
+                    }}
+                    className="btn-ghost"
+                    style={{
+                      padding: "0.5rem 1rem",
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "0.8125rem",
+                      fontWeight: 800,
+                      borderColor: "var(--color-border)",
+                      background: "var(--color-surface-2)",
+                      color: "var(--color-text)",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {validatingCoupon ? "..." : (lang === "ar" ? "تطبيق" : lang === "tr" ? "Uygula" : "Apply")}
+                  </button>
+                </div>
+              )}
+
+              {couponError && (
+                <p style={{ color: "var(--color-danger)", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  ⚠️ {couponError}
+                </p>
+              )}
             </div>
 
             {/* ── Customer form ── */}

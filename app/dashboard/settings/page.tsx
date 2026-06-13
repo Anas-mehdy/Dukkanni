@@ -333,6 +333,48 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* ── Manage Promotions Card ── */}
+      <section
+        className="card animate-fade-in"
+        style={{
+          padding: "1.25rem",
+          marginBottom: "1rem",
+          background: "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)",
+          border: "1.5px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+          <div>
+            <h3 style={{ fontSize: "0.875rem", fontWeight: 800, margin: 0, color: "var(--color-text)" }}>
+              🏷️ العروض والكوبونات
+            </h3>
+            <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "4px", lineHeight: 1.4 }}>
+              إنشاء كوبونات الخصم للعملاء أو تفعيل خصومات تلقائية على المنتجات في متجرك
+            </p>
+          </div>
+          <Link
+            href="/dashboard/promotions"
+            style={{
+              background: "var(--color-surface-3)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+              padding: "0.5rem 1rem",
+              borderRadius: "var(--radius-full)",
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.05)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            إدارة العروض ←
+          </Link>
+        </div>
+      </section>
+
       <form onSubmit={handleSubmit} noValidate>
 
         {/* ── Section 1: Logo ── */}
