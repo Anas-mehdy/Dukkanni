@@ -210,7 +210,14 @@ function ResetPasswordContent() {
             type="button"
             className="btn-primary"
             style={{ width: "100%", marginTop: "1rem" }}
-            onClick={() => router.push("/login?mode=forgot")}
+            onClick={async () => {
+              try {
+                await supabase.auth.signOut();
+              } catch (err) {
+                console.error("Sign out error:", err);
+              }
+              router.push("/login?mode=forgot");
+            }}
           >
             طلب رابط جديد لإعادة التعيين
           </button>
