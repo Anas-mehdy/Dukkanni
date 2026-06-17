@@ -20,66 +20,96 @@ const resetPasswordSchema = z.object({
 
 type ResetForm = z.infer<typeof resetPasswordSchema>;
 
-const globalExchangePromises: { [code: string]: Promise<{ error: any } | null> } = {};
+// Global cache prevents calling exchangeCodeForSession twice for the same code
+const globalExchangePromises: Record<string, Promise<{ error: any } | null>> = {};
 
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [password, setPassword] = useState("");
+  const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [errors, setErrors] = useState<Partial<ResetForm>>({});
-  const [apiError, setApiError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [isLinkInvalid, setIsLinkInvalid] = useState(false);
+  const [errors, setErrors]                   = useState<Partial<ResetForm>>({});
+  const [apiError, setApiError]               = useState("");
+  const [success, setSuccess]                 = useState(false);
+  const [submitting, setSubmitting]           = useState(false);
 
-  // Exchange recovery code for session (PKCE flow support) or verify active session
+  // "loading"   → waiting for Supabase to confirm the recovery session
+  // "ready"     → recovery session confirmed, show the form
+  // "invalid"   → link is expired / already used / invalid
+  const [authState, setAuthState] = useState<"loading" | "ready" | "invalid">("loading");
+
   useEffect(() => {
-    const handleAuthFlow = async () => {
-      // 1. Check if we have a PKCE code in the URL query params
-      const code = searchParams.get("code");
-      if (code) {
-        setSubmitting(true);
-        try {
-          if (!globalExchangePromises[code]) {
-            globalExchangePromises[code] = supabase.auth.exchangeCodeForSession(code)
-              .then((res: any) => ({ error: res.error }))
-              .catch((err: any) => ({ error: err }));
-          }
+    const supabaseClient = createClient();
+    let settled = false;
 
-          const res = await globalExchangePromises[code];
-          if (res && res.error) {
-            console.error("PKCE Code exchange error:", res.error.message || res.error);
-            setApiError("انتهت صلاحية رابط إعادة التعيين أو تم استخدامه مسبقاً. يرجى طلب رابط جديد.");
-            setIsLinkInvalid(true);
-          }
-        } catch (err) {
-          console.error("Catch code exchange error:", err);
-          setApiError("حدث خطأ أثناء مصادقة جلسة إعادة التعيين.");
-          setIsLinkInvalid(true);
-        } finally {
-          setSubmitting(false);
-        }
-        return;
-      }
+    function markReady() {
+      if (settled) return;
+      settled = true;
+      setAuthState("ready");
+      setSubmitting(false);
+    }
 
-      // 2. Otherwise check if we already have an active session (Implicit flow/hash or stored cookie)
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setApiError("لم يتم العثور على جلسة صالحة لإعادة تعيين كلمة المرور. يرجى طلب رابط جديد.");
-          setIsLinkInvalid(true);
+    function markInvalid(msg: string) {
+      if (settled) return;
+      settled = true;
+      setApiError(msg);
+      setAuthState("invalid");
+      setSubmitting(false);
+    }
+
+    // --- Listen to auth state changes ---
+    // This fires for BOTH:
+    //   • Implicit flow  → PASSWORD_RECOVERY event (tokens in URL hash)
+    //   • PKCE flow      → SIGNED_IN event after exchangeCodeForSession succeeds
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+      (event: any, session: any) => {
+        if (event === "PASSWORD_RECOVERY") {
+          markReady();
+        } else if (event === "SIGNED_IN" && session) {
+          // PKCE code was exchanged successfully and user is now signed in
+          markReady();
         }
-      } catch (err) {
-        console.error("Error getting session:", err);
-        setApiError("حدث خطأ أثناء التحقق من الجلسة.");
-        setIsLinkInvalid(true);
       }
+    );
+
+    // --- Handle PKCE flow: ?code= in query params ---
+    const code = searchParams.get("code");
+    if (code) {
+      setSubmitting(true);
+      if (!globalExchangePromises[code]) {
+        globalExchangePromises[code] = supabaseClient.auth
+          .exchangeCodeForSession(code)
+          .then((res: any) => ({ error: res.error }))
+          .catch((err: any) => ({ error: err }));
+      }
+      globalExchangePromises[code].then((res) => {
+        if (res?.error) {
+          console.error("Code exchange failed:", res.error?.message ?? res.error);
+          markInvalid(
+            "انتهت صلاحية رابط إعادة التعيين أو تم استخدامه مسبقاً. يرجى طلب رابط جديد."
+          );
+        }
+        // If success → onAuthStateChange will fire SIGNED_IN → markReady()
+      });
+    }
+
+    // --- Safety timeout ---
+    // If neither the hash-based recovery event nor the PKCE code exchange
+    // resolve within 8 seconds, consider the link invalid.
+    const timeout = setTimeout(() => {
+      markInvalid(
+        "انتهت صلاحية رابط إعادة التعيين أو تم استخدامه مسبقاً. يرجى طلب رابط جديد."
+      );
+    }, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
     };
-    handleAuthFlow();
-  }, [supabase, searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,14 +134,15 @@ function ResetPasswordContent() {
       });
 
       if (error) {
-        setApiError(error.message.includes("session") ? "انتهت صلاحية جلسة إعادة التعيين. يرجى طلب رابط جديد." : error.message);
+        setApiError(
+          error.message.includes("session")
+            ? "انتهت صلاحية جلسة إعادة التعيين. يرجى طلب رابط جديد."
+            : error.message
+        );
       } else {
         setSuccess(true);
-        // Clean session or sign out so they can log in fresh
         await supabase.auth.signOut();
-        setTimeout(() => {
-          router.push("/login");
-        }, 4000);
+        setTimeout(() => router.push("/login"), 4000);
       }
     } catch {
       setApiError("حدث خطأ أثناء تحديث كلمة المرور. يرجى المحاولة مجدداً.");
@@ -120,6 +151,12 @@ function ResetPasswordContent() {
     }
   };
 
+  const handleRequestNewLink = async () => {
+    try { await supabase.auth.signOut(); } catch {}
+    router.push("/login?mode=forgot");
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -144,8 +181,18 @@ function ResetPasswordContent() {
         </p>
       </div>
 
-      {/* API Error banner */}
-      {apiError && (
+      {/* Loading state */}
+      {authState === "loading" && (
+        <div style={{ textAlign: "center", padding: "2rem 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <SpinnerIcon size={32} />
+          <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
+            جاري التحقق من صلاحية الرابط...
+          </p>
+        </div>
+      )}
+
+      {/* Error banner (shown alongside invalid state too) */}
+      {apiError && authState !== "loading" && (
         <div
           role="alert"
           style={{
@@ -168,20 +215,17 @@ function ResetPasswordContent() {
         </div>
       )}
 
+      {/* Success state */}
       {success ? (
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem 0" }}>
           <div
             style={{
-              width: "60px",
-              height: "60px",
+              width: "60px", height: "60px",
               borderRadius: "50%",
               background: "var(--color-success-muted)",
               border: "2px solid var(--color-success)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.75rem",
-              margin: "0 auto 0.5rem",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1.75rem", margin: "0 auto 0.5rem",
             }}
           >
             ✓
@@ -190,7 +234,7 @@ function ResetPasswordContent() {
             تم تحديث كلمة المرور بنجاح!
           </p>
           <p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-            لقد قمنا بتحديث كلمة مرورك بنجاح. سيتم توجيهك الآن إلى صفحة تسجيل الدخول لتسجيل الدخول بكلمة المرور الجديدة.
+            سيتم توجيهك الآن إلى صفحة تسجيل الدخول لتسجيل الدخول بكلمة المرور الجديدة.
           </p>
           <button
             type="button"
@@ -201,28 +245,25 @@ function ResetPasswordContent() {
             تسجيل الدخول الآن
           </button>
         </div>
-      ) : isLinkInvalid ? (
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem 0" }}>
-          <p style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-            عذراً، هذا الرابط لم يعد صالحاً للاستخدام. يرجى العودة لصفحة تسجيل الدخول وطلب رابط جديد لإعادة تعيين كلمة المرور.
+
+      ) : authState === "invalid" ? (
+        /* Expired / already-used link */
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", padding: "0.5rem 0" }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", lineHeight: 1.6 }}>
+            عذراً، هذا الرابط لم يعد صالحاً. يرجى العودة لصفحة تسجيل الدخول وطلب رابط جديد لإعادة تعيين كلمة المرور.
           </p>
           <button
             type="button"
             className="btn-primary"
-            style={{ width: "100%", marginTop: "1rem" }}
-            onClick={async () => {
-              try {
-                await supabase.auth.signOut();
-              } catch (err) {
-                console.error("Sign out error:", err);
-              }
-              router.push("/login?mode=forgot");
-            }}
+            style={{ width: "100%", marginTop: "0.5rem" }}
+            onClick={handleRequestNewLink}
           >
             طلب رابط جديد لإعادة التعيين
           </button>
         </div>
-      ) : (
+
+      ) : authState === "ready" ? (
+        /* Password update form — only shown after recovery session is confirmed */
         <form onSubmit={handleSubmit} noValidate>
           {/* Password */}
           <div style={{ marginBottom: "1rem" }}>
@@ -275,7 +316,7 @@ function ResetPasswordContent() {
           >
             {submitting ? (
               <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
-                <SpinnerIcon />
+                <SpinnerIcon size={16} />
                 جاري التحديث...
               </span>
             ) : (
@@ -283,7 +324,7 @@ function ResetPasswordContent() {
             )}
           </button>
         </form>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -312,14 +353,14 @@ export default function ResetPasswordPage() {
   );
 }
 
-function SpinnerIcon() {
+function SpinnerIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
-      width="16" height="16"
+      width={size} height={size}
       viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="2.5"
       strokeLinecap="round"
-      style={{ animation: "spin 0.7s linear infinite" }}
+      style={{ animation: "spin 0.7s linear infinite", flexShrink: 0 }}
     >
       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
