@@ -33,6 +33,7 @@ function ResetPasswordContent() {
   const [apiError, setApiError] = useState("");
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isLinkInvalid, setIsLinkInvalid] = useState(false);
 
   // Exchange recovery code for session (PKCE flow support) or verify active session
   useEffect(() => {
@@ -52,10 +53,12 @@ function ResetPasswordContent() {
           if (res && res.error) {
             console.error("PKCE Code exchange error:", res.error.message || res.error);
             setApiError("انتهت صلاحية رابط إعادة التعيين أو تم استخدامه مسبقاً. يرجى طلب رابط جديد.");
+            setIsLinkInvalid(true);
           }
         } catch (err) {
           console.error("Catch code exchange error:", err);
           setApiError("حدث خطأ أثناء مصادقة جلسة إعادة التعيين.");
+          setIsLinkInvalid(true);
         } finally {
           setSubmitting(false);
         }
@@ -66,10 +69,13 @@ function ResetPasswordContent() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          // If no session is active and no code query param, the user might have opened page directly
+          setApiError("لم يتم العثور على جلسة صالحة لإعادة تعيين كلمة المرور. يرجى طلب رابط جديد.");
+          setIsLinkInvalid(true);
         }
       } catch (err) {
         console.error("Error getting session:", err);
+        setApiError("حدث خطأ أثناء التحقق من الجلسة.");
+        setIsLinkInvalid(true);
       }
     };
     handleAuthFlow();
@@ -193,6 +199,20 @@ function ResetPasswordContent() {
             onClick={() => router.push("/login")}
           >
             تسجيل الدخول الآن
+          </button>
+        </div>
+      ) : isLinkInvalid ? (
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem 0" }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+            عذراً، هذا الرابط لم يعد صالحاً للاستخدام. يرجى العودة لصفحة تسجيل الدخول وطلب رابط جديد لإعادة تعيين كلمة المرور.
+          </p>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ width: "100%", marginTop: "1rem" }}
+            onClick={() => router.push("/login?mode=forgot")}
+          >
+            طلب رابط جديد لإعادة التعيين
           </button>
         </div>
       ) : (

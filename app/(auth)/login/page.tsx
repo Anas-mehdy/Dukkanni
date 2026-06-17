@@ -12,7 +12,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
@@ -55,6 +55,12 @@ function LoginFormContent() {
   // Password recovery states
   const [mode, setMode] = useState<"login" | "forgot">("login");
   const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("mode") === "forgot") {
+      setMode("forgot");
+    }
+  }, [searchParams]);
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
