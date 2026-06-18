@@ -58,6 +58,22 @@ export default function RootLayout({
             })();
           `}
         </script>
+        <script>
+          {`
+            (function() {
+              try {
+                var urlParams = new URLSearchParams(window.location.search);
+                var ref = urlParams.get('ref');
+                if (ref) {
+                  localStorage.setItem('dukkanni_referral', ref);
+                  var date = new Date();
+                  date.setTime(date.getTime() + (90 * 24 * 60 * 60 * 1000));
+                  document.cookie = "dukkanni_referral=" + encodeURIComponent(ref) + "; expires=" + date.toUTCString() + "; path=/; SameSite=Lax";
+                }
+              } catch (e) {}
+            })();
+          `}
+        </script>
       </head>
       <body className="min-h-dvh flex flex-col overflow-x-hidden" suppressHydrationWarning>{children}</body>
     </html>

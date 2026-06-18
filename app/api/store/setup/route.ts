@@ -24,6 +24,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizePhone } from "@/lib/whatsapp";
 import { RESERVED_SLUGS } from "@/lib/constants";
+import { cookies } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -120,25 +122,74 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Read referral cookie and verify partner ──────────────────────────────
+  let affiliateIdToLink: string | null = null;
+  let referralCodeToLink: string | null = null;
+
+  try {
+    const cookieStore = await cookies();
+    const cookieRef = cookieStore.get("dukkanni_referral")?.value;
+    if (cookieRef) {
+      const adminDb = createAdminClient();
+      const { data: partner } = await adminDb
+        .from("affiliate_partners" as any)
+        .select("id, referral_code")
+        .eq("referral_code", cookieRef)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (partner) {
+        affiliateIdToLink = partner.id;
+        referralCodeToLink = partner.referral_code;
+      }
+    }
+  } catch (e) {
+    console.error("Error checking referral cookie during registration:", e);
+  }
+
   // ── Create store ───────────────────────────────────────────────────────────
+  const insertPayload: any = {
+    owner_id:     user.id,
+    name,
+    slug,
+    whatsapp_e164,
+    currency_code,
+    is_active:    true,
+    owner_email:  user.email,
+    owner_name:   user.user_metadata?.full_name || user.email,
+  };
+
+  if (affiliateIdToLink) {
+    insertPayload.affiliate_id = affiliateIdToLink;
+    insertPayload.referral_code = referralCodeToLink;
+    insertPayload.referral_date = new Date().toISOString();
+  }
+
   const { data: store, error: insertErr } = await supabase
-    .from("stores")
-    .insert({
-      owner_id:     user.id,
-      name,
-      slug,
-      whatsapp_e164,
-      currency_code,
-      is_active:    true,
-      owner_email:  user.email,
-      owner_name:   user.user_metadata?.full_name || user.email,
-    })
+    .from("stores" as any)
+    .insert(insertPayload)
     .select("id, name, slug, whatsapp_e164, currency_code")
     .single();
 
   if (insertErr || !store) {
     console.error("[POST /api/store/setup]", insertErr);
     return err("خطأ في إنشاء المتجر. حاول مجدداً", 500);
+  }
+
+  // ── Create affiliate referral log if linked ───────────────────────────────
+  if (affiliateIdToLink && referralCodeToLink) {
+    try {
+      const adminDb = createAdminClient();
+      await adminDb
+        .from("affiliate_referrals" as any)
+        .insert({
+          affiliate_id: affiliateIdToLink,
+          store_id: store.id,
+          referral_code: referralCodeToLink,
+        });
+    } catch (refErr) {
+      console.error("Error inserting affiliate referral log:", refErr);
+    }
   }
 
   return ok(store, 201);
