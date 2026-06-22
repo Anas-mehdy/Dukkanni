@@ -58,7 +58,10 @@ export async function GET() {
         subscription_ends_at,
         owner_id,
         owner_email,
-        owner_name
+        owner_name,
+        products (
+          id
+        )
       `)
       .order("created_at", { ascending: false });
 
@@ -121,6 +124,7 @@ export async function GET() {
         owner_email: s.owner_email || "غير متوفر",
         owner_phone: s.whatsapp_e164 || "غير متوفر",
         owner_name: s.owner_name || "غير متوفر",
+        products_count: s.products ? s.products.length : 0,
       };
     });
 

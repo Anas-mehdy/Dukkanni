@@ -18,6 +18,7 @@ interface StoreDetail {
   totalPayments: number;
   lifetimeCommission: number;
   monthlyCommission: number;
+  products_count?: number;
 }
 
 interface PartnerDetails {
@@ -329,10 +330,27 @@ export default function AffiliateDetailsPage({
                     return (
                       <tr key={s.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
                         <td style={tableCellStyle}>
-                          <div>
-                            <div style={{ fontWeight: 800, color: "var(--color-text)" }}>{s.name}</div>
-                            <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }} dir="ltr">@{s.slug}</span>
-                          </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: 800, color: "var(--color-text)" }}>{s.name}</span>
+                              <span
+                                style={{
+                                  fontSize: "0.6875rem",
+                                  fontWeight: 700,
+                                  background: "var(--color-surface-3)",
+                                  color: "var(--color-text-muted)",
+                                  padding: "0.1rem 0.35rem",
+                                  borderRadius: "var(--radius-sm)",
+                                  border: "1px solid var(--color-border)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap"
+                                }}
+                                title="عدد المنتجات الحالية في هذا المتجر"
+                              >
+                                📦 {s.products_count ?? 0} منتج
+                              </span>
+                            </div>
+                            <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }} dir="ltr">@{s.slug}</span>
                         </td>
                         <td style={tableCellStyle}>
                           <div>

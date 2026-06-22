@@ -61,7 +61,7 @@ export async function GET(
     // 2. Fetch referred stores
     const { data: stores, error: storesErr } = await adminDb
       .from("stores" as any)
-      .select("id, name, owner_name, owner_email, plan_tier, plan_type, subscription_status, subscription_ends_at, affiliate_id, referral_code, referral_date, created_at")
+      .select("id, name, owner_name, owner_email, plan_tier, plan_type, subscription_status, subscription_ends_at, affiliate_id, referral_code, referral_date, created_at, products (id)")
       .eq("affiliate_id", id)
       .order("created_at", { ascending: false });
 
@@ -81,7 +81,8 @@ export async function GET(
         ...store,
         totalPayments,
         lifetimeCommission,
-        monthlyCommission
+        monthlyCommission,
+        products_count: store.products ? store.products.length : 0
       };
     });
 

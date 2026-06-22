@@ -17,6 +17,7 @@ interface Store {
   owner_email: string;
   owner_name: string;
   owner_phone: string;
+  products_count?: number;
 }
 
 export default function AdminDashboard() {
@@ -495,7 +496,26 @@ export default function AdminDashboard() {
                       }}
                     >
                       <td style={tdStyle}>
-                        <div style={{ fontWeight: 800, color: "var(--color-text)", fontSize: "0.875rem" }}>{s.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 800, color: "var(--color-text)", fontSize: "0.875rem" }}>{s.name}</span>
+                          <span
+                            style={{
+                              fontSize: "0.6875rem",
+                              fontWeight: 700,
+                              background: "var(--color-surface-3)",
+                              color: "var(--color-text-muted)",
+                              padding: "0.1rem 0.35rem",
+                              borderRadius: "var(--radius-sm)",
+                              border: "1px solid var(--color-border)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              whiteSpace: "nowrap"
+                            }}
+                            title="عدد المنتجات الحالية في هذا المتجر"
+                          >
+                            📦 {s.products_count ?? 0} منتج
+                          </span>
+                        </div>
                         <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "2px" }}>
                           {s.owner_name}
                         </div>
